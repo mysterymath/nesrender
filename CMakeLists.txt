@@ -6,5 +6,5 @@ project(render LANGUAGES ASM CXX)
 add_executable(render main.cc chr.s)
 set_property(SOURCE chr.s PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/chr.chr)
 
-target_link_libraries(render neslib)
+target_link_libraries(render neslib nesdoug)
 target_include_directories(render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
