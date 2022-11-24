@@ -28,12 +28,14 @@ int main() {
   }
 }
 
-// Later, produce a random smattering of differences. For now, just cycle the
-// color of the top left pixel.
 void random_diffs() {
-  char cur = (fb_next[0] + 1) & 0b11;
-  fb_next[0] &= 0b11111100;
-  fb_next[0] |= cur;
+  constexpr char num_updates = 128;
+  for (char i = 0; i < num_updates; ++i) {
+    char pos = rand8();
+    if (pos > 240)
+      pos -= 240;
+    fb_next[pos] = rand8();
+  }
 }
 
 constexpr char max_updates_per_frame = 5;
@@ -45,6 +47,16 @@ __attribute__((noinline)) void render() {
   for (char i = 0; i < sizeof(fb_next); ++i) {
     char prev = fb_prev[i];
     char next = fb_next[i];
+
+    if (next == prev) {
+      x += 4;
+      if (x > 30) {
+        x -= 30;
+        ++y;
+      }
+      continue;
+    }
+
     for (char j = 0; j < 4; ++j) {
       char prev_lo = prev & 0b11;
       char next_lo = next & 0b11;
