@@ -31,10 +31,7 @@ int main() {
 void random_diffs() {
   constexpr char num_updates = 128;
   for (char i = 0; i < num_updates; ++i) {
-    char pos = rand8();
-    if (pos > 240)
-      pos -= 240;
-    fb_next[pos] = rand8();
+    fb_next[i] = rand8();
   }
 }
 
