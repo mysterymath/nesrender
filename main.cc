@@ -8,7 +8,7 @@ char fb_prev[240];
 char fb_next[240];
 
 void random_diffs();
-void render();
+void present();
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -23,7 +23,7 @@ int main() {
     char pad_t = pad_trigger(0);
     if (pad_t & PAD_A)
       random_diffs();
-    render();
+    present();
     gray_line();
   }
 }
@@ -38,10 +38,10 @@ void random_diffs() {
   }
 }
 
-constexpr char max_updates_per_frame = 5;
+constexpr char max_updates_per_frame = 10;
 char vram_buf[max_updates_per_frame * 3 + 1];
 
-__attribute__((noinline)) void render() {
+__attribute__((noinline)) void present() {
   char x = 0, y = 0, update_idx = 0, updates_left = max_updates_per_frame;
   bool any_updates = false;
   for (char i = 0; i < sizeof(fb_next); ++i) {
