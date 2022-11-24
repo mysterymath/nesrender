@@ -36,7 +36,7 @@ void mutate() {
          sizeof(fb_next));
 }
 
-constexpr char max_updates_per_frame = 1;
+constexpr char max_updates_per_frame = 4;
 char vram_buf[max_updates_per_frame * 3 + 1];
 
 __attribute__((noinline)) void present() {
@@ -47,8 +47,8 @@ __attribute__((noinline)) void present() {
 
     if (next == cur) {
       y += 4;
-      if (y > 32) {
-        y -= 32;
+      if (y >= 30) {
+        y -= 30;
         ++x;
       }
       continue;
@@ -69,7 +69,7 @@ __attribute__((noinline)) void present() {
 
       cur >>= 2;
       next >>= 2;
-      if (++y == 33) {
+      if (++y == 30) {
         y = 0;
         ++x;
       }
