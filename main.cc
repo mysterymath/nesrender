@@ -1,9 +1,9 @@
 #include <nesdoug.h>
 #include <neslib.h>
 
-// Framebuffers for the previous and next frame, with 2 bits per pixel. Each
-// pixel corresponds to one of the tiles in the NES nametable and controls its
-// color.
+// Framebuffers for the previous and next frame, with 2 bits per pixel, in
+// column major order. Each pixel corresponds to one of the tiles in the NES
+// nametable and controls its color.
 char fb_prev[240];
 char fb_next[240];
 
@@ -29,13 +29,13 @@ int main() {
 }
 
 void random_diffs() {
-  constexpr char num_updates = 128;
+  constexpr char num_updates = 240;
   for (char i = 0; i < num_updates; ++i) {
     fb_next[i] = rand8();
   }
 }
 
-constexpr char max_updates_per_frame = 10;
+constexpr char max_updates_per_frame = 4;
 char vram_buf[max_updates_per_frame * 3 + 1];
 
 __attribute__((noinline)) void present() {
@@ -46,10 +46,10 @@ __attribute__((noinline)) void present() {
     char next = fb_next[i];
 
     if (next == prev) {
-      x += 4;
-      if (x > 30) {
-        x -= 30;
-        ++y;
+      y += 4;
+      if (y > 32) {
+        y -= 32;
+        ++x;
       }
       continue;
     }
@@ -70,9 +70,9 @@ __attribute__((noinline)) void present() {
 
       prev <<= 2;
       next <<= 2;
-      if (++x == 31) {
-        x = 0;
-        ++y;
+      if (++y == 33) {
+        y = 0;
+        ++x;
       }
     }
     fb_prev[i] = fb_next[i];
