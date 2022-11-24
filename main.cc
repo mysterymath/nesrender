@@ -36,7 +36,7 @@ void mutate() {
          sizeof(fb_next));
 }
 
-constexpr char max_updates_per_frame = 4;
+constexpr char max_updates_per_frame = 32;
 char vram_buf[max_updates_per_frame * 3 + 1];
 
 __attribute__((noinline)) void present() {
