@@ -30,10 +30,30 @@ int main() {
   }
 }
 
+void draw_vert_line(char color, char x, char y_top, char y_bot) {
+  char offset = (x * 30 + y_top) / 4;
+  char shift = (x * 30 + y_top) % 4;
+  char y = y_top-shift;
+  // Draw portion of line before we get to the full-byte region.
+  if (shift) {
+    char and_mask = 0;
+    char or_mask = 0;
+    for (char s = 0; s < 4; ++s, ++y) {
+      and_mask >>= 2;
+      or_mask >>= 2;
+      if (s < shift || y > y_bot)
+        and_mask |= 0b11000000;
+      else
+        or_mask |= color << 6;
+    }
+    fb_next[offset] &= and_mask;
+    fb_next[offset] |= or_mask;
+  }
+}
+
 void mutate() {
-  char color = (fb_next[0] + 1) & 0b11;
-  memset(fb_next, color | color << 2 | color << 4 | color << 6,
-         sizeof(fb_next));
+  memset(fb_next, 0, sizeof(fb_next));
+  draw_vert_line(1, 3, 4, 5);
 }
 
 constexpr char max_updates_per_frame = 32;
