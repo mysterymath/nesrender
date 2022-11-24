@@ -41,8 +41,7 @@ char vram_buf[max_updates_per_frame * 3 + 1];
 
 __attribute__((noinline)) void present() {
   char x = 0, y = 0, update_idx = 0, updates_left = max_updates_per_frame;
-  bool any_updates = false;
-  for (char i = 0; i < sizeof(fb_next); ++i) {
+  for (char i = 0; i < sizeof(fb_next) && updates_left; ++i) {
     char cur = fb_cur[i];
     char next = fb_next[i];
 
@@ -62,7 +61,6 @@ __attribute__((noinline)) void present() {
       if (next_lo != cur_lo) {
         if (!updates_left--)
           goto done;
-        any_updates = true;
         unsigned addr = NTADR_A(x, y);
         vram_buf[update_idx++] = addr >> 8;
         vram_buf[update_idx++] = addr & 0xff;
@@ -77,11 +75,9 @@ __attribute__((noinline)) void present() {
       }
     }
     fb_cur[i] = fb_next[i];
-    if (!updates_left)
-      break;
   }
 done:
-  if (any_updates) {
+  if (updates_left != max_updates_per_frame) {
     vram_buf[update_idx] = NT_UPD_EOF;
     set_vram_update(vram_buf);
   }
