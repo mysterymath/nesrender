@@ -70,12 +70,37 @@ void draw_vert_line(char color, char x, char y_top, char y_bot) {
     }
     fb_next[offset] &= and_mask;
     fb_next[offset] |= or_mask;
+    ++offset;
+  }
+
+  if (y + 4 <= y_bot) {
+    char color_byte = 0;
+    for (char s = 0; s < 4; ++s) {
+      color_byte <<= 2;
+      color_byte |= color;
+    }
+    while (y + 4 <= y_bot) {
+      fb_next[offset++] = color_byte;
+      y += 4;
+    }
+  }
+
+  if (y < y_bot) {
+    char and_mask = 0xff;
+    char or_mask = 0;
+    while (y++ < y_bot) {
+      and_mask <<= 2;
+      or_mask <<= 2;
+      or_mask |= color;
+    }
+    fb_next[offset] &= and_mask;
+    fb_next[offset] |= or_mask;
   }
 }
 
 void render() {
   memset(fb_next, 0, sizeof(fb_next));
-  draw_vert_line(1, 3, 4, 5);
+  draw_vert_line(1, x, y_top, y_bot);
 }
 
 constexpr char max_updates_per_frame = 32;
