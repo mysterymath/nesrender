@@ -9,8 +9,13 @@
 char fb_cur[240];
 char fb_next[240];
 
-void mutate();
+void render();
 void present();
+
+char x = 1;
+char y_top = 2;
+char y_bot = 3;
+bool control_top;
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -23,8 +28,25 @@ int main() {
     ppu_wait_nmi();
     set_vram_update(NULL);
     char pad_t = pad_trigger(0);
+    char pad = pad_state(0);
+    if (pad & PAD_LEFT)
+      x = x ? x - 1 : 31;
+    else if (pad & PAD_RIGHT)
+      x = x == 31 ? 0 : x + 1;
+    if (pad & PAD_UP) {
+      if (control_top)
+        y_top = y_top ? y_top - 1 : 29;
+      else
+        y_bot = y_bot ? y_bot - 1 : 29;
+    } else if (pad & PAD_DOWN) {
+      if (control_top)
+        y_top = y_top == 29 ? 0 : y_top + 1;
+      else
+        y_bot = y_bot == 29 ? 0 : y_bot + 1;
+    }
     if (pad_t & PAD_A)
-      mutate();
+      control_top = !control_top;
+    render();
     present();
     gray_line();
   }
@@ -33,7 +55,7 @@ int main() {
 void draw_vert_line(char color, char x, char y_top, char y_bot) {
   char offset = (x * 30 + y_top) / 4;
   char shift = (x * 30 + y_top) % 4;
-  char y = y_top-shift;
+  char y = y_top - shift;
   // Draw portion of line before we get to the full-byte region.
   if (shift) {
     char and_mask = 0;
@@ -51,7 +73,7 @@ void draw_vert_line(char color, char x, char y_top, char y_bot) {
   }
 }
 
-void mutate() {
+void render() {
   memset(fb_next, 0, sizeof(fb_next));
   draw_vert_line(1, 3, 4, 5);
 }
