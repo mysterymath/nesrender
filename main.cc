@@ -3,19 +3,16 @@
 
 #include <string.h>
 
-// Framebuffers for the current and next frame, with 2 bits per pixel, in
-// column major order. Each pixel corresponds to one of the tiles in the NES
-// nametable and controls its color.
-char fb_cur[240];
-char fb_next[240];
-
 void render();
-void present();
 
 char x = 1;
 char y_top = 2;
 char y_bot = 3;
 bool control_top;
+
+char skip_to_line;
+bool unfinished;
+volatile bool render_to_nt_b;
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -27,125 +24,69 @@ int main() {
   while (true) {
     ppu_wait_nmi();
     set_vram_update(NULL);
-    char pad_t = pad_trigger(0);
-    char pad = pad_state(0);
-    if (pad & PAD_LEFT)
-      x = x ? x - 1 : 31;
-    else if (pad & PAD_RIGHT)
-      x = x == 31 ? 0 : x + 1;
-    if (pad & PAD_UP) {
-      if (control_top)
-        y_top = y_top ? y_top - 1 : 29;
-      else
-        y_bot = y_bot ? y_bot - 1 : 29;
-    } else if (pad & PAD_DOWN) {
-      if (control_top)
-        y_top = y_top == 29 ? 0 : y_top + 1;
-      else
-        y_bot = y_bot == 29 ? 0 : y_bot + 1;
+    if (!skip_to_line) {
+      scroll(render_to_nt_b ? 0x100 : 0, 0);
+      render_to_nt_b = !render_to_nt_b;
+      char pad_t = pad_trigger(0);
+      char pad = pad_state(0);
+      if (pad & PAD_LEFT)
+        x = x ? x - 1 : 31;
+      else if (pad & PAD_RIGHT)
+        x = x == 31 ? 0 : x + 1;
+      if (pad & PAD_UP) {
+        if (control_top)
+          y_top = y_top ? y_top - 1 : 29;
+        else
+          y_bot = y_bot ? y_bot - 1 : 29;
+      } else if (pad & PAD_DOWN) {
+        if (control_top)
+          y_top = y_top == 29 ? 0 : y_top + 1;
+        else
+          y_bot = y_bot == 29 ? 0 : y_bot + 1;
+      }
+      if (pad_t & PAD_A)
+        control_top = !control_top;
     }
-    if (pad_t & PAD_A)
-      control_top = !control_top;
     render();
-    present();
     gray_line();
   }
 }
 
+char vram_buf_idx;
+char vram_buf[40];
+char cur_line;
+
 void draw_vert_line(char color, char x, char y_top, char y_bot) {
-  char offset = (x * 30 + y_top) / 4;
-  char shift = (x * 30 + y_top) % 4;
-  char y = y_top - shift;
-  // Draw portion of line before we get to the full-byte region.
-  if (shift) {
-    char and_mask = 0;
-    char or_mask = 0;
-    for (char s = 0; s < 4; ++s, ++y) {
-      and_mask >>= 2;
-      or_mask >>= 2;
-      if (s < shift || y > y_bot)
-        and_mask |= 0b11000000;
-      else
-        or_mask |= color << 6;
-    }
-    fb_next[offset] &= and_mask;
-    fb_next[offset] |= or_mask;
-    ++offset;
+  if (unfinished)
+    return;
+  if (cur_line < skip_to_line) {
+    cur_line++;
+    return;
   }
-
-  if (y + 4 <= y_bot) {
-    char color_byte = 0;
-    for (char s = 0; s < 4; ++s) {
-      color_byte <<= 2;
-      color_byte |= color;
-    }
-    while (y + 4 <= y_bot) {
-      fb_next[offset++] = color_byte;
-      y += 4;
-    }
+  if (vram_buf_idx + y_bot - y_top + 4 >= sizeof(vram_buf)) {
+    skip_to_line = cur_line;
+    unfinished = true;
+    return;
   }
-
-  if (y < y_bot) {
-    char and_mask = 0xff;
-    char or_mask = 0;
-    while (y++ < y_bot) {
-      and_mask <<= 2;
-      or_mask <<= 2;
-      or_mask |= color;
-    }
-    fb_next[offset] &= and_mask;
-    fb_next[offset] |= or_mask;
-  }
+  cur_line++;
+  unsigned vram_addr = render_to_nt_b ? NTADR_B(x, y_top) : NTADR_A(x, y_top);
+  vram_buf[vram_buf_idx++] = vram_addr >> 8 | NT_UPD_VERT;
+  vram_buf[vram_buf_idx++] = vram_addr & 0xff;
+  vram_buf[vram_buf_idx++] = y_bot - y_top + 1;
+  for (char y = y_top; y <= y_bot; ++y)
+    vram_buf[vram_buf_idx++] = color;
 }
 
 void render() {
-  memset(fb_next, 0, sizeof(fb_next));
-  draw_vert_line(1, x, y_top, y_bot);
-}
-
-constexpr char max_updates_per_frame = 32;
-char vram_buf[max_updates_per_frame * 3 + 1];
-
-__attribute__((noinline)) void present() {
-  char x = 0, y = 0, update_idx = 0, updates_left = max_updates_per_frame;
-  for (char i = 0; i < sizeof(fb_next) && updates_left; ++i) {
-    char cur = fb_cur[i];
-    char next = fb_next[i];
-
-    if (next == cur) {
-      y += 4;
-      if (y >= 30) {
-        y -= 30;
-        ++x;
-      }
-      continue;
-    }
-
-    for (char j = 0; j < 4; ++j) {
-      char cur_lo = cur & 0b11;
-      char next_lo = next & 0b11;
-
-      if (next_lo != cur_lo) {
-        if (!updates_left--)
-          goto done;
-        unsigned addr = NTADR_A(x, y);
-        vram_buf[update_idx++] = addr >> 8;
-        vram_buf[update_idx++] = addr & 0xff;
-        vram_buf[update_idx++] = next_lo;
-      }
-
-      cur >>= 2;
-      next >>= 2;
-      if (++y == 30) {
-        y = 0;
-        ++x;
-      }
-    }
-    fb_cur[i] = fb_next[i];
-  }
-done:
-  if (updates_left != max_updates_per_frame) {
-    vram_buf[update_idx] = NT_UPD_EOF;
-    set_vram_update(vram_buf);
-  }
+  unfinished = false;
+  vram_buf_idx = 0;
+  cur_line = 0;
+  for (int x = 0; x < 32; x++)
+    draw_vert_line(0, x, 0, 29);
+  if (y_top <= y_bot)
+    draw_vert_line(1, x, y_top, y_bot);
+  vram_buf[vram_buf_idx] = NT_UPD_EOF;
+  set_vram_update(vram_buf);
+  if (!unfinished)
+    skip_to_line = 0;
 }
