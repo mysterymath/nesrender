@@ -3,6 +3,14 @@
 
 #include <string.h>
 
+// Configure for SNROM MMC1 board.
+asm (
+  ".globl __chr_rom_size\n"
+  "__chr_rom_size = 8\n"
+  ".globl __prg_ram_size\n"
+  "__prg_ram_size = 8\n"
+);
+
 void render();
 
 char x = 1;

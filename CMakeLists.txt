@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-set(LLVM_MOS_PLATFORM nes-nrom)
+set(LLVM_MOS_PLATFORM nes-mmc1)
 find_package(llvm-mos-sdk REQUIRED)
 project(render LANGUAGES ASM CXX)
 
