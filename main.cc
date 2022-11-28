@@ -18,9 +18,9 @@ char fb_next[960];
 void render();
 void present();
 
-char x = 1;
-char y_top = 2;
-char y_bot = 3;
+char x = 15;
+char y_top = 5;
+char y_bot = 25;
 bool control_top;
 
 bool still_presenting;
