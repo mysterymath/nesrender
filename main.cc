@@ -81,7 +81,7 @@ volatile unsigned max_updates_per_frame = 0;
 
 void present() {
   char vram_buf_idx = 0;
-  static char vram_buf[80];
+  static char vram_buf[76];
   static bool present_to_nt_b;
 
 #if !NDEBUG
@@ -109,11 +109,19 @@ void present() {
   char *prev = present_to_nt_b ? fb_b : fb_a;
   unsigned vram = present_to_nt_b ? NAMETABLE_B : NAMETABLE_A;
 
+  if (still_presenting)
+    gray_line();
+
   still_presenting = false;
   for (char x = 0; x < 32; x++, vram -= 959) {
+    char chain_len_idx = 0;
     for (char y = 0; y < 30; y++, next++, prev++, vram += 32) {
-      char chain = 0xff, chain_len_idx = 0;
-      if (*next == chain) {
+      if (*next == *prev) {
+        chain_len_idx = 0;
+        continue;
+      }
+
+      if (chain_len_idx) {
         if (vram_buf_idx + 1 >= sizeof(vram_buf)) {
           still_presenting = true;
           goto done;
@@ -123,19 +131,17 @@ void present() {
         *prev = *next;
         continue;
       }
+
       if (vram_buf_idx + 4 >= sizeof(vram_buf)) {
         still_presenting = true;
         goto done;
       }
-      if (*next != *prev) {
-        vram_buf[vram_buf_idx++] = NT_UPD_VERT | vram >> 8;
-        vram_buf[vram_buf_idx++] = vram & 0xff;
-        chain_len_idx = vram_buf_idx++;
-        vram_buf[chain_len_idx] = 1;
-        vram_buf[vram_buf_idx++] = *next;
-        *prev = *next;
-        chain = *next;
-      }
+      vram_buf[vram_buf_idx++] = NT_UPD_VERT | vram >> 8;
+      vram_buf[vram_buf_idx++] = vram & 0xff;
+      chain_len_idx = vram_buf_idx++;
+      vram_buf[chain_len_idx] = 1;
+      vram_buf[vram_buf_idx++] = *next;
+      *prev = *next;
     }
   }
 done:
