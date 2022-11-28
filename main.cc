@@ -67,7 +67,6 @@ void wall_move_to(char x, char y_top, char y_bot);
 void wall_draw_to(char color, char x, char y_top, char y_bot);
 
 void render() {
-  gray_line();
   wall_move_to(0, 0, 29);
   wall_draw_to(1, corner_x, corner_y_top, corner_y_bot);
   wall_draw_to(2, 33, 0, 29);
@@ -75,13 +74,28 @@ void render() {
 
 void present() {
   char vram_buf_idx = 0;
-  static char vram_buf[40];
+  static char vram_buf[64];
   static bool present_to_nt_b;
 
   unsigned offset = 0;
   still_presenting = false;
   for (char x = 0; x < 32; x++) {
     for (char y = 0; y < 30; y++) {
+      char chain = 0xff, chain_len_idx = 0;
+      if (fb_next[offset] == chain) {
+        if (vram_buf_idx + 1 >= sizeof(vram_buf)) {
+          still_presenting = true;
+          goto done;
+        }
+        vram_buf[vram_buf_idx++] = fb_next[offset];
+        vram_buf[chain_len_idx]++;
+        if (present_to_nt_b)
+          fb_b[offset] = fb_next[offset];
+        else
+          fb_a[offset] = fb_next[offset];
+        ++offset;
+        continue;
+      }
       if (vram_buf_idx + 4 >= sizeof(vram_buf)) {
         still_presenting = true;
         goto done;
@@ -89,18 +103,24 @@ void present() {
       if (present_to_nt_b) {
         if (fb_next[offset] != fb_b[offset]) {
           unsigned addr = NTADR_B(x, y);
-          vram_buf[vram_buf_idx++] = addr >> 8;
+          vram_buf[vram_buf_idx++] = NT_UPD_VERT | addr >> 8;
           vram_buf[vram_buf_idx++] = addr & 0xff;
+          chain_len_idx = vram_buf_idx++;
+          vram_buf[chain_len_idx] = 1;
           vram_buf[vram_buf_idx++] = fb_next[offset];
           fb_b[offset] = fb_next[offset];
+          chain = fb_next[offset];
         }
       } else {
         if (fb_next[offset] != fb_a[offset]) {
           unsigned addr = NTADR_A(x, y);
-          vram_buf[vram_buf_idx++] = addr >> 8;
+          vram_buf[vram_buf_idx++] = NT_UPD_VERT | addr >> 8;
           vram_buf[vram_buf_idx++] = addr & 0xff;
+          chain_len_idx = vram_buf_idx++;
+          vram_buf[chain_len_idx] = 1;
           vram_buf[vram_buf_idx++] = fb_next[offset];
           fb_a[offset] = fb_next[offset];
+          chain = fb_next[offset];
         }
       }
       ++offset;
