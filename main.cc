@@ -105,53 +105,37 @@ void present() {
   }
 #endif
 
-  unsigned offset = 0;
+  char *next = fb_next;
+  char *prev = present_to_nt_b ? fb_b : fb_a;
+  unsigned vram = present_to_nt_b ? NAMETABLE_B : NAMETABLE_A;
+
   still_presenting = false;
-  for (char x = 0; x < 32; x++) {
-    for (char y = 0; y < 30; y++) {
+  for (char x = 0; x < 32; x++, vram -= 959) {
+    for (char y = 0; y < 30; y++, next++, prev++, vram += 32) {
       char chain = 0xff, chain_len_idx = 0;
-      if (fb_next[offset] == chain) {
+      if (*next == chain) {
         if (vram_buf_idx + 1 >= sizeof(vram_buf)) {
           still_presenting = true;
           goto done;
         }
-        vram_buf[vram_buf_idx++] = fb_next[offset];
+        vram_buf[vram_buf_idx++] = *next;
         vram_buf[chain_len_idx]++;
-        if (present_to_nt_b)
-          fb_b[offset] = fb_next[offset];
-        else
-          fb_a[offset] = fb_next[offset];
-        ++offset;
+        *prev = *next;
         continue;
       }
       if (vram_buf_idx + 4 >= sizeof(vram_buf)) {
         still_presenting = true;
         goto done;
       }
-      if (present_to_nt_b) {
-        if (fb_next[offset] != fb_b[offset]) {
-          unsigned addr = NTADR_B(x, y);
-          vram_buf[vram_buf_idx++] = NT_UPD_VERT | addr >> 8;
-          vram_buf[vram_buf_idx++] = addr & 0xff;
-          chain_len_idx = vram_buf_idx++;
-          vram_buf[chain_len_idx] = 1;
-          vram_buf[vram_buf_idx++] = fb_next[offset];
-          fb_b[offset] = fb_next[offset];
-          chain = fb_next[offset];
-        }
-      } else {
-        if (fb_next[offset] != fb_a[offset]) {
-          unsigned addr = NTADR_A(x, y);
-          vram_buf[vram_buf_idx++] = NT_UPD_VERT | addr >> 8;
-          vram_buf[vram_buf_idx++] = addr & 0xff;
-          chain_len_idx = vram_buf_idx++;
-          vram_buf[chain_len_idx] = 1;
-          vram_buf[vram_buf_idx++] = fb_next[offset];
-          fb_a[offset] = fb_next[offset];
-          chain = fb_next[offset];
-        }
+      if (*next != *prev) {
+        vram_buf[vram_buf_idx++] = NT_UPD_VERT | vram >> 8;
+        vram_buf[vram_buf_idx++] = vram & 0xff;
+        chain_len_idx = vram_buf_idx++;
+        vram_buf[chain_len_idx] = 1;
+        vram_buf[vram_buf_idx++] = *next;
+        *prev = *next;
+        chain = *next;
       }
-      ++offset;
     }
   }
 done:
