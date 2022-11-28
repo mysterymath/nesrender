@@ -25,6 +25,8 @@ bool still_presenting;
 void render();
 void present();
 
+unsigned frame_count;
+
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
   ppu_off();
@@ -57,6 +59,9 @@ int main() {
       }
       if (pad_t & PAD_A)
         control_top = !control_top;
+#if !NDEBUG
+      frame_count++;
+#endif
     }
     render();
     present();
@@ -72,10 +77,33 @@ void render() {
   wall_draw_to(2, 33, 0, 29);
 }
 
+volatile unsigned max_updates_per_frame = 0;
+
 void present() {
   char vram_buf_idx = 0;
   static char vram_buf[80];
   static bool present_to_nt_b;
+
+#if !NDEBUG
+  if (frame_count > 2 && !still_presenting) {
+    unsigned num_updates = 0;
+    unsigned offset = 0;
+    for (char x = 0; x < 32; x++) {
+      for (char y = 0; y < 30; y++) {
+        if (present_to_nt_b) {
+          if (fb_next[offset] != fb_b[offset])
+            ++num_updates;
+        } else {
+          if (fb_next[offset] != fb_a[offset])
+            ++num_updates;
+        }
+        offset++;
+      }
+    }
+    if (num_updates > max_updates_per_frame)
+      max_updates_per_frame = num_updates;
+  }
+#endif
 
   unsigned offset = 0;
   still_presenting = false;
