@@ -1,4 +1,5 @@
 #include <bank.h>
+#include <nes.h>
 #include <nesdoug.h>
 #include <neslib.h>
 #include <string.h>
@@ -38,7 +39,6 @@ int main() {
 
   while (true) {
     ppu_wait_nmi();
-    set_vram_update(NULL);
     if (!still_presenting) {
       char pad_t = pad_trigger(0);
       char pad = pad_state(0);
@@ -79,9 +79,16 @@ void render() {
 
 volatile unsigned max_updates_per_frame = 0;
 
-void present() {
-  char vram_buf_idx = 0;
-  static char vram_buf[76];
+extern "C" {
+#pragma clang section bss = ".prg_ram_0"
+volatile char vram_buf[1500];
+#pragma clang section bss = ""
+}
+
+volatile bool vram_buf_ready;
+
+__attribute__((noinline)) void present() {
+  unsigned vbi = 0;
   static bool present_to_nt_b;
 
 #if !NDEBUG
@@ -113,44 +120,64 @@ void present() {
     gray_line();
 
   still_presenting = false;
+  vram_buf_ready = false;
+  char cur_color = 0;
   for (char x = 0; x < 32; x++, vram -= 959) {
-    char chain_len_idx = 0;
     for (char y = 0; y < 30; y++, next++, prev++, vram += 32) {
       if (*next == *prev) {
-        chain_len_idx = 0;
         continue;
       }
 
-      if (chain_len_idx) {
-        if (vram_buf_idx + 1 >= sizeof(vram_buf)) {
-          still_presenting = true;
-          goto done;
-        }
-        vram_buf[vram_buf_idx++] = *next;
-        vram_buf[chain_len_idx]++;
-        *prev = *next;
-        continue;
-      }
-
-      if (vram_buf_idx + 4 >= sizeof(vram_buf)) {
+      if (vbi + 16 >= sizeof(vram_buf)) {
         still_presenting = true;
         goto done;
       }
-      vram_buf[vram_buf_idx++] = NT_UPD_VERT | vram >> 8;
-      vram_buf[vram_buf_idx++] = vram & 0xff;
-      chain_len_idx = vram_buf_idx++;
-      vram_buf[chain_len_idx] = 1;
-      vram_buf[vram_buf_idx++] = *next;
+      // LDA #>vram
+      vram_buf[vbi++] = 0xa9;
+      vram_buf[vbi++] = vram >> 8;
+      // STA PPUADDR
+      vram_buf[vbi++] = 0x8d;
+      vram_buf[vbi++] = 0x06;
+      vram_buf[vbi++] = 0x20;
+      // LDA #<vram
+      vram_buf[vbi++] = 0xa9;
+      vram_buf[vbi++] = vram & 0xff;
+      // STA PPUADDR
+      vram_buf[vbi++] = 0x8d;
+      vram_buf[vbi++] = 0x06;
+      vram_buf[vbi++] = 0x20;
+      // LDA #color
+      vram_buf[vbi++] = 0xa9;
+      vram_buf[vbi++] = *next;
+      // STA PPUDATA
+      vram_buf[vbi++] = 0x8d;
+      vram_buf[vbi++] = 0x07;
+      vram_buf[vbi++] = 0x20;
       *prev = *next;
     }
   }
 done:
-  vram_buf[vram_buf_idx] = NT_UPD_EOF;
-  set_vram_update(vram_buf);
+  // RTS
+  vram_buf[vbi] = 0x60;
+  vram_buf_ready = true;
   if (!still_presenting) {
     scroll(present_to_nt_b ? 0x100 : 0, 0);
     present_to_nt_b = !present_to_nt_b;
   }
+}
+
+asm(".section .nmi.0,\"axR\"\n"
+    "\tjsr update_vram\n");
+
+extern "C" {
+  extern volatile char VRAM_UPDATE;
+}
+
+extern "C" void update_vram() {
+  if (!vram_buf_ready)
+    return;
+  asm ("jsr vram_buf");
+  VRAM_UPDATE = 1;
 }
 
 char cur_x;
