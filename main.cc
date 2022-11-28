@@ -74,7 +74,7 @@ void render() {
 
 void present() {
   char vram_buf_idx = 0;
-  static char vram_buf[64];
+  static char vram_buf[80];
   static bool present_to_nt_b;
 
   unsigned offset = 0;
