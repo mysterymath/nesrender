@@ -11,6 +11,8 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
+#define DOUBLE_BUFFER false
+
 #pragma clang section bss = ".prg_ram_0"
 char fb_a[960];
 char fb_b[960];
@@ -28,8 +30,6 @@ void render();
 void present();
 
 unsigned frame_count;
-
-#define DOUBLE_BUFFER false
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -117,9 +117,6 @@ __attribute__((noinline)) void present() {
   char *next = fb_next;
   char *prev = DOUBLE_BUFFER && present_to_nt_b ? fb_b : fb_a;
   unsigned vram = DOUBLE_BUFFER && present_to_nt_b ? NAMETABLE_B : NAMETABLE_A;
-
-  if (still_presenting)
-    gray_line();
 
   still_presenting = false;
   vram_buf_ready = false;
