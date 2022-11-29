@@ -16,9 +16,9 @@ char fb_cur[960];
 char fb_next[960];
 #pragma clang section bss = ""
 
-char corner_x = 15;
-char corner_y_top = 5;
-char corner_y_bot = 20;
+char corner_x = 30;
+char corner_y_top = 10;
+char corner_y_bot = 40;
 bool control_top;
 
 bool still_presenting;
@@ -42,19 +42,19 @@ int main() {
       char pad_t = pad_trigger(0);
       char pad = pad_state(0);
       if (pad & PAD_LEFT)
-        corner_x = corner_x ? corner_x - 1 : 31;
+        corner_x = corner_x ? corner_x - 1 : 63;
       else if (pad & PAD_RIGHT)
-        corner_x = corner_x == 31 ? 0 : corner_x + 1;
+        corner_x = corner_x == 63 ? 0 : corner_x + 1;
       if (pad & PAD_UP) {
         if (control_top)
-          corner_y_top = corner_y_top ? corner_y_top - 1 : 29;
+          corner_y_top = corner_y_top ? corner_y_top - 1 : 59;
         else
-          corner_y_bot = corner_y_bot ? corner_y_bot - 1 : 29;
+          corner_y_bot = corner_y_bot ? corner_y_bot - 1 : 59;
       } else if (pad & PAD_DOWN) {
         if (control_top)
-          corner_y_top = corner_y_top == 29 ? 0 : corner_y_top + 1;
+          corner_y_top = corner_y_top == 59 ? 0 : corner_y_top + 1;
         else
-          corner_y_bot = corner_y_bot == 29 ? 0 : corner_y_bot + 1;
+          corner_y_bot = corner_y_bot == 59 ? 0 : corner_y_bot + 1;
       }
       if (pad_t & PAD_A)
         control_top = !control_top;
@@ -71,9 +71,9 @@ void wall_move_to(char x, char y_top, char y_bot);
 void wall_draw_to(char color, char x, char y_top, char y_bot);
 
 void render() {
-  wall_move_to(0, 0, 29);
+  wall_move_to(0, 0, 59);
   wall_draw_to(1, corner_x, corner_y_top, corner_y_bot);
-  wall_draw_to(2, 33, 0, 29);
+  wall_draw_to(2, 65, 0, 59);
 }
 
 volatile unsigned max_updates_per_frame = 0;
@@ -84,7 +84,7 @@ volatile char vram_buf[1500];
 
 volatile bool vram_buf_ready;
 
-__attribute__((noinline)) void present() {
+void present() {
   unsigned vbi = 0;
 #if !NDEBUG
   if (frame_count > 2 && !still_presenting) {
@@ -182,17 +182,32 @@ void wall_draw_to(char color, char x, char y_top, char y_bot) {
   unsigned y_top_fp = cur_y_top << 8;
   unsigned y_bot_fp = cur_y_bot << 8;
 
-  char *fb_col = &fb_next[cur_x * 30];
+  char *fb_col = &fb_next[cur_x / 2 * 30];
   for (char draw_x = cur_x; draw_x < x; ++draw_x) {
-    for (char y = 0; y < 30; ++y) {
+    for (char y = 0; y < 60; ++y) {
+      char new_color;
       if (y < y_top_fp >> 8)
-        fb_col[y] = 3;
+        new_color = 3;
       else if (y <= y_bot_fp >> 8)
-        fb_col[y] = color;
+        new_color = color;
       else
-        fb_col[y] = 0;
+        new_color = 0;
+      if (draw_x & 1 && y & 1) {
+        fb_col[y/2] &= 0b00111111;
+        fb_col[y/2] |= new_color << 6;
+      } else if (draw_x & 1) {
+        fb_col[y/2] &= 0b11001111;
+        fb_col[y/2] |= new_color << 4;
+      } else if (y & 1) {
+        fb_col[y/2] &= 0b11110011;
+        fb_col[y/2] |= new_color << 2;
+      } else {
+        fb_col[y/2] &= 0b11111100;
+        fb_col[y/2] |= new_color;
+      }
     }
-    fb_col += 30;
+    if (draw_x & 1)
+      fb_col += 30;
     y_top_fp += m_top;
     y_bot_fp += m_bot;
   }

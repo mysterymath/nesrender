@@ -5,8 +5,7 @@ project(render LANGUAGES ASM C)
 
 set(CMAKE_EXECUTABLE_SUFFIX .nes)
 
-add_executable(render main.c chr.s)
-set_property(SOURCE chr.s PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/chr.chr)
+add_executable(render main.c chr.c)
 
 target_link_libraries(render neslib nesdoug)
 target_include_directories(render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
