@@ -28,13 +28,16 @@ void present();
 
 unsigned frame_count;
 
+constexpr bool DOUBLE_BUFFER = false;
+
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
   ppu_off();
   set_mirroring(MIRROR_VERTICAL);
   pal_bg_bright(4);
   pal_bg(bg_pal);
-  scroll(0x100, 0);
+  if (DOUBLE_BUFFER)
+    scroll(0x100, 0);
   ppu_on_bg();
 
   while (true) {
@@ -113,8 +116,8 @@ __attribute__((noinline)) void present() {
 #endif
 
   char *next = fb_next;
-  char *prev = present_to_nt_b ? fb_b : fb_a;
-  unsigned vram = present_to_nt_b ? NAMETABLE_B : NAMETABLE_A;
+  char *prev = DOUBLE_BUFFER && present_to_nt_b ? fb_b : fb_a;
+  unsigned vram = DOUBLE_BUFFER && present_to_nt_b ? NAMETABLE_B : NAMETABLE_A;
 
   if (still_presenting)
     gray_line();
@@ -160,7 +163,7 @@ done:
   // RTS
   vram_buf[vbi] = 0x60;
   vram_buf_ready = true;
-  if (!still_presenting) {
+  if (!still_presenting && DOUBLE_BUFFER) {
     scroll(present_to_nt_b ? 0x100 : 0, 0);
     present_to_nt_b = !present_to_nt_b;
   }
