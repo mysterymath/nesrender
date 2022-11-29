@@ -171,6 +171,41 @@ void wall_move_to(char x, char y_top, char y_bot) {
   cur_y_bot = y_bot;
 }
 
+void draw_vert_wall(char color, char *col, char x, char y_top, char y_bot) {
+  if (y_top >= y_bot)
+    return;
+  char i = y_top / 2;
+  if (y_top & 1) {
+    if (x & 1) {
+      col[i] &= 0b00111111;
+      col[i] |= color << 6;
+    } else {
+      col[i] &= 0b11110011;
+      col[i] |= color << 2;
+    }
+    i++;
+  }
+  while (i < y_bot / 2) {
+    if (x & 1) {
+      col[i] &= 0b00001111;
+      col[i] |= color << 6 | color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= color << 2 | color << 0;
+    }
+    i++;
+  }
+  if (y_bot & 1) {
+    if (x & 1) {
+      col[i] &= 0b11001111;
+      col[i] |= color << 4;
+    } else {
+      col[i] &= 0b11111100;
+      col[i] |= color << 0;
+    }
+  }
+}
+
 void wall_draw_to(char color, char x, char y_top, char y_bot) {
   char dx = x - cur_x;
   signed char dy_top = y_top - cur_y_top;
@@ -184,28 +219,9 @@ void wall_draw_to(char color, char x, char y_top, char y_bot) {
 
   char *fb_col = &fb_next[cur_x / 2 * 30];
   for (char draw_x = cur_x; draw_x < x; ++draw_x) {
-    for (char y = 0; y < 60; ++y) {
-      char new_color;
-      if (y < y_top_fp >> 8)
-        new_color = 3;
-      else if (y <= y_bot_fp >> 8)
-        new_color = color;
-      else
-        new_color = 0;
-      if (draw_x & 1 && y & 1) {
-        fb_col[y/2] &= 0b00111111;
-        fb_col[y/2] |= new_color << 6;
-      } else if (draw_x & 1) {
-        fb_col[y/2] &= 0b11001111;
-        fb_col[y/2] |= new_color << 4;
-      } else if (y & 1) {
-        fb_col[y/2] &= 0b11110011;
-        fb_col[y/2] |= new_color << 2;
-      } else {
-        fb_col[y/2] &= 0b11111100;
-        fb_col[y/2] |= new_color;
-      }
-    }
+    draw_vert_wall(3, fb_col, draw_x, 0, y_top_fp / 256);
+    draw_vert_wall(color, fb_col, draw_x, y_top_fp / 256, y_bot_fp / 256);
+    draw_vert_wall(0, fb_col, draw_x, y_bot_fp / 256, 61);
     if (draw_x & 1)
       fb_col += 30;
     y_top_fp += m_top;
