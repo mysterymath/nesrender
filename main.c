@@ -2,6 +2,7 @@
 #include <nes.h>
 #include <nesdoug.h>
 #include <neslib.h>
+#include <stdbool.h>
 #include <string.h>
 
 // Configure for SNROM MMC1 board.
@@ -28,7 +29,7 @@ void present();
 
 unsigned frame_count;
 
-constexpr bool DOUBLE_BUFFER = false;
+#define DOUBLE_BUFFER false
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -82,11 +83,9 @@ void render() {
 
 volatile unsigned max_updates_per_frame = 0;
 
-extern "C" {
 #pragma clang section bss = ".prg_ram_0"
 volatile char vram_buf[1500];
 #pragma clang section bss = ""
-}
 
 volatile bool vram_buf_ready;
 
@@ -172,14 +171,12 @@ done:
 asm(".section .nmi.0,\"axR\"\n"
     "\tjsr update_vram\n");
 
-extern "C" {
-  extern volatile char VRAM_UPDATE;
-}
+extern volatile char VRAM_UPDATE;
 
-extern "C" void update_vram() {
+void update_vram() {
   if (!vram_buf_ready)
     return;
-  asm ("jsr vram_buf");
+  asm("jsr vram_buf");
   VRAM_UPDATE = 1;
 }
 
