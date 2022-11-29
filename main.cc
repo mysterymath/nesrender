@@ -41,20 +41,26 @@ int main() {
     if (!still_presenting) {
       char pad_t = pad_trigger(0);
       char pad = pad_state(0);
-      if (pad & PAD_LEFT)
-        corner_x = corner_x ? corner_x - 1 : 63;
-      else if (pad & PAD_RIGHT)
-        corner_x = corner_x == 63 ? 0 : corner_x + 1;
+      if (pad & PAD_LEFT && corner_x >= 2)
+        corner_x -= 2;
+      else if (pad & PAD_RIGHT && corner_x <= 61)
+        corner_x += 2;
       if (pad & PAD_UP) {
-        if (control_top)
-          corner_y_top = corner_y_top ? corner_y_top - 1 : 59;
-        else
-          corner_y_bot = corner_y_bot ? corner_y_bot - 1 : 59;
+        if (control_top) {
+          if (corner_y_top >= 2)
+            corner_y_top -= 2;
+        } else {
+          if (corner_y_bot >= 2)
+            corner_y_bot -= 2;
+        }
       } else if (pad & PAD_DOWN) {
-        if (control_top)
-          corner_y_top = corner_y_top == 59 ? 0 : corner_y_top + 1;
-        else
-          corner_y_bot = corner_y_bot == 59 ? 0 : corner_y_bot + 1;
+        if (control_top) {
+          if (corner_y_top <= 57)
+            corner_y_top += 2;
+        } else {
+          if (corner_y_bot >= 2)
+            corner_y_bot += 2;
+        }
       }
       if (pad_t & PAD_A)
         control_top = !control_top;
