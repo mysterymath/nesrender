@@ -61,8 +61,8 @@ int main() {
 #if !NDEBUG
       frame_count++;
 #endif
+      render();
     }
-    render();
     present();
   }
 }
