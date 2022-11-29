@@ -154,7 +154,7 @@ asm(".section .nmi.0,\"axR\"\n"
 
 extern volatile char VRAM_UPDATE;
 
-void update_vram() {
+extern "C" void update_vram() {
   if (!vram_buf_ready)
     return;
   asm("jsr vram_buf");
@@ -171,12 +171,13 @@ void wall_move_to(char x, char y_top, char y_bot) {
   cur_y_bot = y_bot;
 }
 
-void draw_vert_wall(char color, char *col, char x, char y_top, char y_bot) {
+template <bool x_odd>
+void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
   if (y_top >= y_bot)
     return;
   char i = y_top / 2;
   if (y_top & 1) {
-    if (x & 1) {
+    if (x_odd) {
       col[i] &= 0b00111111;
       col[i] |= color << 6;
     } else {
@@ -186,7 +187,7 @@ void draw_vert_wall(char color, char *col, char x, char y_top, char y_bot) {
     i++;
   }
   while (i < y_bot / 2) {
-    if (x & 1) {
+    if (x_odd) {
       col[i] &= 0b00001111;
       col[i] |= color << 6 | color << 4;
     } else {
@@ -196,7 +197,7 @@ void draw_vert_wall(char color, char *col, char x, char y_top, char y_bot) {
     i++;
   }
   if (y_bot & 1) {
-    if (x & 1) {
+    if (x_odd) {
       col[i] &= 0b11001111;
       col[i] |= color << 4;
     } else {
@@ -219,11 +220,16 @@ void wall_draw_to(char color, char x, char y_top, char y_bot) {
 
   char *fb_col = &fb_next[cur_x / 2 * 30];
   for (char draw_x = cur_x; draw_x < x; ++draw_x) {
-    draw_vert_wall(3, fb_col, draw_x, 0, y_top_fp / 256);
-    draw_vert_wall(color, fb_col, draw_x, y_top_fp / 256, y_bot_fp / 256);
-    draw_vert_wall(0, fb_col, draw_x, y_bot_fp / 256, 61);
-    if (draw_x & 1)
+    if (draw_x & 1) {
+      draw_vert_wall<true>(3, fb_col, 0, y_top_fp / 256);
+      draw_vert_wall<true>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
+      draw_vert_wall<true>(0, fb_col, y_bot_fp / 256, 61);
       fb_col += 30;
+    } else {
+      draw_vert_wall<false>(3, fb_col, 0, y_top_fp / 256);
+      draw_vert_wall<false>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
+      draw_vert_wall<false>(0, fb_col, y_bot_fp / 256, 61);
+    }
     y_top_fp += m_top;
     y_bot_fp += m_bot;
   }
