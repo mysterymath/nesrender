@@ -11,11 +11,8 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-#define DOUBLE_BUFFER false
-
 #pragma clang section bss = ".prg_ram_0"
-char fb_a[960];
-char fb_b[960];
+char fb_cur[960];
 char fb_next[960];
 #pragma clang section bss = ""
 
@@ -37,8 +34,6 @@ int main() {
   set_mirroring(MIRROR_VERTICAL);
   pal_bg_bright(4);
   pal_bg(bg_pal);
-  if (DOUBLE_BUFFER)
-    scroll(0x100, 0);
   ppu_on_bg();
 
   while (true) {
@@ -91,21 +86,14 @@ volatile bool vram_buf_ready;
 
 __attribute__((noinline)) void present() {
   unsigned vbi = 0;
-  static bool present_to_nt_b;
-
 #if !NDEBUG
   if (frame_count > 2 && !still_presenting) {
     unsigned num_updates = 0;
     unsigned offset = 0;
     for (char x = 0; x < 32; x++) {
       for (char y = 0; y < 30; y++) {
-        if (present_to_nt_b) {
-          if (fb_next[offset] != fb_b[offset])
-            ++num_updates;
-        } else {
-          if (fb_next[offset] != fb_a[offset])
-            ++num_updates;
-        }
+        if (fb_next[offset] != fb_b[offset])
+          ++num_updates;
         offset++;
       }
     }
@@ -115,15 +103,15 @@ __attribute__((noinline)) void present() {
 #endif
 
   char *next = fb_next;
-  char *prev = DOUBLE_BUFFER && present_to_nt_b ? fb_b : fb_a;
-  unsigned vram = DOUBLE_BUFFER && present_to_nt_b ? NAMETABLE_B : NAMETABLE_A;
+  char *cur = fb_cur;
+  unsigned vram = NAMETABLE_A;
 
   still_presenting = false;
   vram_buf_ready = false;
   char cur_color = 0;
   for (char x = 0; x < 32; x++, vram -= 959) {
-    for (char y = 0; y < 30; y++, next++, prev++, vram += 32) {
-      if (*next == *prev) {
+    for (char y = 0; y < 30; y++, next++, cur++, vram += 32) {
+      if (*next == *cur) {
         continue;
       }
 
@@ -152,17 +140,13 @@ __attribute__((noinline)) void present() {
       vram_buf[vbi++] = 0x8d;
       vram_buf[vbi++] = 0x07;
       vram_buf[vbi++] = 0x20;
-      *prev = *next;
+      *cur = *next;
     }
   }
 done:
   // RTS
   vram_buf[vbi] = 0x60;
   vram_buf_ready = true;
-  if (!still_presenting && DOUBLE_BUFFER) {
-    scroll(present_to_nt_b ? 0x100 : 0, 0);
-    present_to_nt_b = !present_to_nt_b;
-  }
 }
 
 asm(".section .nmi.0,\"axR\"\n"
