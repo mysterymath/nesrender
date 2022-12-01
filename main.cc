@@ -3,6 +3,7 @@
 #include <nesdoug.h>
 #include <neslib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 // Configure for SNROM MMC1 board.
@@ -73,13 +74,151 @@ int main() {
   }
 }
 
+// Values are 8:8 fixed point screen pixels.
+void line_move_to(uint16_t x, uint16_t y);
+void line_draw_to(uint8_t color, uint16_t x, uint16_t y);
+
 void wall_move_to(char x, char y_top, char y_bot);
 void wall_draw_to(char color, char x, char y_top, char y_bot);
 
 void render() {
+#if 0
   wall_move_to(0, 0, 59);
   wall_draw_to(1, corner_x, corner_y_top, corner_y_bot);
   wall_draw_to(2, 65, 0, 59);
+#endif
+  memset(fb_next, 0, sizeof(fb_next));
+  line_move_to(128, 128);
+  line_draw_to(1, corner_x << 8 | 128, corner_y_bot << 8 | 128);
+}
+
+uint16_t wall_cur_x;
+// uint8_t *wall_cur_fb_x;
+uint16_t wall_cur_y;
+
+void line_move_to(uint16_t x, uint16_t y) {
+  wall_cur_x = x;
+  wall_cur_y = y;
+  // wall_cur_fb_x = (uint8_t*)fb_next + (x >> 8) * 30;
+}
+
+template <typename T> T abs(T t) { return t < 0 ? -t : t; }
+template <typename T> T rotl(T t, uint8_t amt) {
+  return t << amt | t >> (sizeof(T) * 8 - amt);
+}
+
+volatile uint8_t and_mask;
+
+void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
+  int16_t dx = to_x - wall_cur_x;
+  int16_t dy = to_y - wall_cur_y;
+
+  if (abs(dx) >= abs(dy)) {
+    dy = (int32_t)dy * 256 / dx;
+    if (dx > 0)
+      dx = 1 * 256;
+    else if (dx < 0)
+      dx = -1 * 256;
+  } else {
+    dx = (int32_t)dx * 256 / dy;
+    if (dy > 0)
+      dy = 1 * 256;
+    else if (dy < 0)
+      dy = -1 * 256;
+  }
+
+  uint16_t x = wall_cur_x;
+  uint16_t y = wall_cur_y;
+  while ((dx < 0 ? x > to_x : x < to_x) || (dy < 0 ? y > to_y : y < to_y)) {
+    uint8_t shift = (x / 256 % 2 * 2 + y / 256 % 2) * 2;
+    and_mask = rotl((uint8_t)0b11111100, shift);
+    uint8_t or_mask = color << shift;
+    uint16_t offset = x / 256 / 2 * 30 + y / 256 / 2;
+    fb_next[offset] &= and_mask;
+    fb_next[offset] |= or_mask;
+    x += dx;
+    y += dy;
+  }
+}
+
+char cur_x;
+char cur_y_top;
+char cur_y_bot;
+
+void wall_move_to(char x, char y_top, char y_bot) {
+  cur_x = x;
+  cur_y_top = y_top;
+  cur_y_bot = y_bot;
+}
+
+template <bool x_odd>
+void draw_vert_wall(char color, char *col, char y_top, char y_bot);
+
+void wall_draw_to(char color, char x, char y_top, char y_bot) {
+  char dx = x - cur_x;
+  signed char dy_top = y_top - cur_y_top;
+  signed char dy_bot = y_bot - cur_y_bot;
+  // Values in 8.8 fixed point
+  int m_top = dy_top * 256 / dx;
+  int m_bot = dy_bot * 256 / dx;
+
+  unsigned y_top_fp = cur_y_top << 8;
+  unsigned y_bot_fp = cur_y_bot << 8;
+
+  char *fb_col = &fb_next[cur_x / 2 * 30];
+  for (char draw_x = cur_x; draw_x < x; ++draw_x) {
+    if (draw_x & 1) {
+      draw_vert_wall<true>(3, fb_col, 0, y_top_fp / 256);
+      draw_vert_wall<true>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
+      draw_vert_wall<true>(0, fb_col, y_bot_fp / 256, 61);
+      fb_col += 30;
+    } else {
+      draw_vert_wall<false>(3, fb_col, 0, y_top_fp / 256);
+      draw_vert_wall<false>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
+      draw_vert_wall<false>(0, fb_col, y_bot_fp / 256, 61);
+    }
+    y_top_fp += m_top;
+    y_bot_fp += m_bot;
+  }
+  cur_x = x;
+  cur_y_top = y_top;
+  cur_y_bot = y_bot;
+}
+
+template <bool x_odd>
+void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
+  if (y_top >= y_bot)
+    return;
+  char i = y_top / 2;
+  if (y_top & 1) {
+    if (x_odd) {
+      col[i] &= 0b00111111;
+      col[i] |= color << 6;
+    } else {
+      col[i] &= 0b11110011;
+      col[i] |= color << 2;
+    }
+    i++;
+  }
+  while (i < y_bot / 2) {
+    if (x_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= color << 6 | color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= color << 2 | color << 0;
+    }
+    i++;
+  }
+  if (y_bot & 1) {
+    if (x_odd) {
+      col[i] &= 0b11001111;
+      col[i] |= color << 4;
+    } else {
+      col[i] &= 0b11111100;
+      col[i] |= color << 0;
+    }
+  }
 }
 
 volatile unsigned max_updates_per_frame = 0;
@@ -165,81 +304,4 @@ extern "C" void update_vram() {
     return;
   asm("jsr vram_buf");
   VRAM_UPDATE = 1;
-}
-
-char cur_x;
-char cur_y_top;
-char cur_y_bot;
-
-void wall_move_to(char x, char y_top, char y_bot) {
-  cur_x = x;
-  cur_y_top = y_top;
-  cur_y_bot = y_bot;
-}
-
-template <bool x_odd>
-void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
-  if (y_top >= y_bot)
-    return;
-  char i = y_top / 2;
-  if (y_top & 1) {
-    if (x_odd) {
-      col[i] &= 0b00111111;
-      col[i] |= color << 6;
-    } else {
-      col[i] &= 0b11110011;
-      col[i] |= color << 2;
-    }
-    i++;
-  }
-  while (i < y_bot / 2) {
-    if (x_odd) {
-      col[i] &= 0b00001111;
-      col[i] |= color << 6 | color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] |= color << 2 | color << 0;
-    }
-    i++;
-  }
-  if (y_bot & 1) {
-    if (x_odd) {
-      col[i] &= 0b11001111;
-      col[i] |= color << 4;
-    } else {
-      col[i] &= 0b11111100;
-      col[i] |= color << 0;
-    }
-  }
-}
-
-void wall_draw_to(char color, char x, char y_top, char y_bot) {
-  char dx = x - cur_x;
-  signed char dy_top = y_top - cur_y_top;
-  signed char dy_bot = y_bot - cur_y_bot;
-  // Values in 8.8 fixed point
-  int m_top = dy_top * 256 / dx;
-  int m_bot = dy_bot * 256 / dx;
-
-  unsigned y_top_fp = cur_y_top << 8;
-  unsigned y_bot_fp = cur_y_bot << 8;
-
-  char *fb_col = &fb_next[cur_x / 2 * 30];
-  for (char draw_x = cur_x; draw_x < x; ++draw_x) {
-    if (draw_x & 1) {
-      draw_vert_wall<true>(3, fb_col, 0, y_top_fp / 256);
-      draw_vert_wall<true>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
-      draw_vert_wall<true>(0, fb_col, y_bot_fp / 256, 61);
-      fb_col += 30;
-    } else {
-      draw_vert_wall<false>(3, fb_col, 0, y_top_fp / 256);
-      draw_vert_wall<false>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
-      draw_vert_wall<false>(0, fb_col, y_bot_fp / 256, 61);
-    }
-    y_top_fp += m_top;
-    y_bot_fp += m_bot;
-  }
-  cur_x = x;
-  cur_y_top = y_top;
-  cur_y_bot = y_bot;
 }
