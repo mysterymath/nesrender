@@ -1,4 +1,4 @@
-print('__attribute__((section(".chr_rom"), used)) const char chr_rom[] = {')
+import sys
 
 rom = [0] * 4096
 
@@ -53,6 +53,4 @@ for i in range(256):
         rom[i << 4 | 0xe] |= 0x0f
         rom[i << 4 | 0xf] |= 0x0f
 
-for i in rom:
-    print(hex(i) + ',')
-print('};')
+sys.stdout.buffer.write(bytes(rom))

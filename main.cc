@@ -41,16 +41,21 @@ constexpr uint16_t ang_speed = 1000;
 
 uint16_t scale = 500;
 
-// As a 0:16 fixed point number
-constexpr uint16_t scale_speed = 100;
+// Percent
+constexpr uint16_t scale_speed = 10;
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
+  static const char spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
-  set_mirroring(MIRROR_VERTICAL);
-  pal_bg_bright(4);
+  set_mmc1_ctrl(0b01100);
+  pal_bright(4);
   pal_bg(bg_pal);
-  ppu_on_bg();
+  pal_spr(spr_pal);
+  bank_spr(1);
+  ppu_on_all();
+
+  oam_spr(128 - 4, 120 - 4, 0, 0);
 
   while (true) {
     ppu_wait_nmi();
@@ -70,9 +75,9 @@ int main() {
 #endif
       if (pad & PAD_A) {
         if (pad & PAD_UP)
-          scale = (uint32_t)scale * 65536 / scale_speed;
+          scale = (uint32_t)scale * (100 + scale_speed) / 100;
         else if (pad & PAD_DOWN)
-          scale = (uint32_t)scale * scale_speed / 65536;
+          scale = (uint32_t)scale * (100 - scale_speed) / 100;
       } else {
 #if 0
         if (pad & PAD_UP)
@@ -84,10 +89,10 @@ int main() {
         int16_t vec_y = sine(player_ang) * speed / 65536;
         if (pad & PAD_UP) {
           player_x += vec_x;
-          player_x += vec_y;
+          player_y += vec_y;
         } else if (pad & PAD_DOWN) {
           player_x -= vec_x;
-          player_x -= vec_y;
+          player_y -= vec_y;
         }
 #endif
       }
@@ -172,7 +177,8 @@ void project(uint16_t *x, uint16_t *y) {
   int16_t tx = *x - player_x;
   int16_t ty = *y - player_y;
 #if 1
-  uint16_t ang = 65536 - player_ang;
+  // The player is facing up in the overhead view.
+  uint16_t ang = PI_OVER_2 - player_ang;
   int32_t c = cosi(ang);
   int32_t s = sine(ang);
   int16_t rx = c * tx / 65536 - s * ty / 65536;
@@ -208,7 +214,8 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
   int16_t dx = to_x - line_cur_x;
   int16_t dy = to_y - line_cur_y;
 
-  if (abs(dx) >= abs(dy)) {
+  bool x_major = abs(dx) >= abs(dy);
+  if (x_major) {
     dy = (int32_t)dy * 256 / abs(dx);
     if (dx > 0)
       dx = 1 * 256;
@@ -224,7 +231,7 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
 
   uint16_t x = line_cur_x;
   uint16_t y = line_cur_y;
-  while ((dx < 0 ? x > to_x : x < to_x) || (dy < 0 ? y > to_y : y < to_y)) {
+  while (x_major ? x / 256 != to_x / 256 : y / 256 != to_y / 256) {
     uint8_t shift = (x / 256 % 2 * 2 + y / 256 % 2) * 2;
     and_mask = rotl((uint8_t)0b11111100, shift);
     uint8_t or_mask = color << shift;
