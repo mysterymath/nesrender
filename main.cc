@@ -59,7 +59,7 @@ int main() {
           if (corner_y_top <= 57)
             corner_y_top += 2;
         } else {
-          if (corner_y_bot >= 2)
+          if (corner_y_bot <= 57)
             corner_y_bot += 2;
         }
       }
