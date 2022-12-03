@@ -30,8 +30,6 @@ bool still_presenting;
 void render();
 void present();
 
-unsigned frame_count;
-
 uint16_t player_x = 150;
 uint16_t player_y = 150;
 uint16_t player_ang = 0;
@@ -62,29 +60,16 @@ int main() {
     if (!still_presenting) {
       char pad_t = pad_trigger(0);
       char pad = pad_state(0);
-#if 0
-      if (pad & PAD_LEFT)
-        player_x -= speed;
-      else if (pad & PAD_RIGHT)
-        player_x += speed;
-#else
       if (pad & PAD_LEFT)
         player_ang += ang_speed;
       else if (pad & PAD_RIGHT)
         player_ang -= ang_speed;
-#endif
       if (pad & PAD_A) {
         if (pad & PAD_UP)
           scale = (uint32_t)scale * (100 + scale_speed) / 100;
         else if (pad & PAD_DOWN)
           scale = (uint32_t)scale * (100 - scale_speed) / 100;
       } else {
-#if 0
-        if (pad & PAD_UP)
-          player_y -= speed;
-        else if (pad & PAD_DOWN)
-          player_y += speed;
-#else
         int16_t vec_x = cosi(player_ang) * speed / 65536;
         int16_t vec_y = sine(player_ang) * speed / 65536;
         if (pad & PAD_UP) {
@@ -94,7 +79,6 @@ int main() {
           player_x -= vec_x;
           player_y -= vec_y;
         }
-#endif
       }
 
 #if 0
@@ -121,9 +105,6 @@ int main() {
       }
       if (pad_t & PAD_A)
         control_top = !control_top;
-#endif
-#if !NDEBUG
-      frame_count++;
 #endif
       render();
     }
@@ -335,21 +316,6 @@ volatile bool vram_buf_ready;
 
 void present() {
   unsigned vbi = 0;
-#if !NDEBUG
-  if (frame_count > 2 && !still_presenting) {
-    unsigned num_updates = 0;
-    unsigned offset = 0;
-    for (char x = 0; x < 32; x++) {
-      for (char y = 0; y < 30; y++) {
-        if (fb_next[offset] != fb_b[offset])
-          ++num_updates;
-        offset++;
-      }
-    }
-    if (num_updates > max_updates_per_frame)
-      max_updates_per_frame = num_updates;
-  }
-#endif
 
   char *next = fb_next;
   char *cur = fb_cur;
