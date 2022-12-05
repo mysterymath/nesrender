@@ -3,8 +3,10 @@
 #include <nes.h>
 #include <nesdoug.h>
 #include <neslib.h>
+#include <peekpoke.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "trig.h"
@@ -37,10 +39,13 @@ uint16_t player_ang = 0;
 constexpr uint16_t speed = 10;
 constexpr uint16_t ang_speed = 1000;
 
-uint16_t scale = 500;
+uint16_t scale = 100;
 
 // Percent
 constexpr uint16_t scale_speed = 10;
+
+constexpr uint16_t width = 64;
+constexpr uint16_t height = 60;
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -66,9 +71,9 @@ int main() {
         player_ang -= ang_speed;
       if (pad & PAD_A) {
         if (pad & PAD_UP)
-          scale = (uint32_t)scale * (100 + scale_speed) / 100;
-        else if (pad & PAD_DOWN)
           scale = (uint32_t)scale * (100 - scale_speed) / 100;
+        else if (pad & PAD_DOWN)
+          scale = (uint32_t)scale * (100 + scale_speed) / 100;
       } else {
         int16_t vec_x = cosi(player_ang) * speed / 65536;
         int16_t vec_y = sine(player_ang) * speed / 65536;
@@ -140,39 +145,103 @@ void render() {
   overhead_wall_draw_to(100, 100);
 }
 
-void project(uint16_t *x, uint16_t *y);
+void to_ndc(uint16_t x, uint16_t y, int32_t *ndc_x, int32_t *ndc_y);
+bool ndc_on_screen(int32_t ndc_x, int32_t ndc_y);
+void clip(int32_t ndc_x, int32_t ndc_y, int32_t *clip_ndc_x, int32_t *clip_ndc_y);
+void to_screen(int32_t ndc_x, int32_t ndc_y, int16_t *sx, int16_t *sy);
+
+int32_t cur_ndc_x;
+int32_t cur_ndc_y;
+
+template <typename T> T abs(T t) { return t < 0 ? -t : t; }
 
 void overhead_wall_move_to(uint16_t x, uint16_t y) {
-  project(&x, &y);
-  line_move_to(x, y);
+  to_ndc(x, y, &cur_ndc_x, &cur_ndc_y);
+  if (ndc_on_screen(cur_ndc_x, cur_ndc_y)) {
+    int16_t sx, sy;
+    to_screen(cur_ndc_x, cur_ndc_y, &sx, &sy);
+    line_move_to(sx, sy);
+  }
 }
+
 void overhead_wall_draw_to(uint16_t x, uint16_t y) {
-  project(&x, &y);
-  line_draw_to(3, x, y);
+  int32_t ndc_x, ndc_y;
+  to_ndc(x, y, &ndc_x, &ndc_y);
+  if (ndc_x < -65536 && cur_ndc_x < -65536 ||
+      ndc_x > 65536 && cur_ndc_x > 65536 ||
+      ndc_y < -65536 && cur_ndc_y < -65536 ||
+      ndc_y > 65536 && cur_ndc_y > 65536) {
+    cur_ndc_x = ndc_x;
+    cur_ndc_y = ndc_y;
+    return;
+  }
+
+  int32_t unclipped_ndc_x = ndc_x;
+  int32_t unclipped_ndc_y = ndc_y;
+
+  if (!ndc_on_screen(cur_ndc_x, cur_ndc_y)) {
+    clip(ndc_x, ndc_y, &cur_ndc_x, &cur_ndc_y);
+    int16_t sx, sy;
+    to_screen(cur_ndc_x, cur_ndc_y, &sx, &sy);
+    line_move_to(sx, sy);
+  }
+  if (!ndc_on_screen(ndc_x, ndc_y))
+    clip(cur_ndc_x, cur_ndc_y, &ndc_x, &ndc_y);
+
+  cur_ndc_x = unclipped_ndc_x;
+  cur_ndc_y = unclipped_ndc_y;
+
+  int16_t sx, sy;
+  to_screen(ndc_x, ndc_y, &sx, &sy);
+  line_draw_to(3, sx, sy);
 }
 
-constexpr uint16_t width = 64;
-constexpr uint16_t height = 60;
-
-void project(uint16_t *x, uint16_t *y) {
-  int16_t tx = *x - player_x;
-  int16_t ty = *y - player_y;
-#if 1
+void to_ndc(uint16_t x, uint16_t y, int32_t *ndc_x, int32_t *ndc_y) {
+  int16_t tx = x - player_x;
+  int16_t ty = y - player_y;
   // The player is facing up in the overhead view.
   uint16_t ang = PI_OVER_2 - player_ang;
   int32_t c = cosi(ang);
   int32_t s = sine(ang);
   int16_t rx = c * tx / 65536 - s * ty / 65536;
   int16_t ry = s * tx / 65536 + c * ty / 65536;
-#else
-  int16_t rx = tx;
-  int16_t ry = ty;
-#endif
-  int16_t sx = (int32_t)rx * 256 * width / scale;
-  int16_t sy = -(int32_t)ry * 256 * width / scale;
-  *x = sx + width * 256 / 2;
-  *y = sy + height * 256 / 2;
+
+  // Scale to NDC as a 16:16 fixed point number.
+  *ndc_x = (int32_t)rx * 65536 / scale;
+  *ndc_y = (int32_t)ry * 65536 / scale * width / height;
 }
+
+bool ndc_on_screen(int32_t ndc_x, int32_t ndc_y) {
+  return abs(ndc_x) <= 65536 && abs(ndc_y) <= 65536;
+}
+
+void clip(int32_t ndc_x, int32_t ndc_y, int32_t *clip_ndc_x, int32_t *clip_ndc_y) {
+  int32_t dy = *clip_ndc_y - ndc_y;
+  int32_t dx = *clip_ndc_x - ndc_x;
+  if (*clip_ndc_x < -65536) {
+    *clip_ndc_y += (-65536 - *clip_ndc_x) * dy / dx;
+    *clip_ndc_x = -65536;
+  }
+  if (*clip_ndc_x > 65536) {
+    *clip_ndc_y -= (*clip_ndc_x - 65536) * dy / dx;
+    *clip_ndc_x = 65536;
+  }
+  if (*clip_ndc_y < -65536) {
+    *clip_ndc_x += (-65536 - *clip_ndc_y) * dx / dy;
+    *clip_ndc_y = -65536;
+  }
+  if (*clip_ndc_y > 65536) {
+    *clip_ndc_x -= (*clip_ndc_y - 65536) * dx / dy;
+    *clip_ndc_y = 65536;
+  }
+}
+
+void to_screen(int32_t ndc_x, int32_t ndc_y, int16_t *sx, int16_t *sy) {
+  *sx = (ndc_x + 65536) * width / 2 / 256;
+  *sy = (65536 - ndc_y) * height / 2 / 256;
+}
+
+extern "C" void __putchar(char c) { POKE(0x4018, c); }
 
 uint16_t line_cur_x;
 // uint8_t *line_cur_fb_x;
@@ -184,7 +253,6 @@ void line_move_to(uint16_t x, uint16_t y) {
   // line_cur_fb_x = (uint8_t*)fb_next + (x >> 8) * 30;
 }
 
-template <typename T> T abs(T t) { return t < 0 ? -t : t; }
 template <typename T> T rotl(T t, uint8_t amt) {
   return t << amt | t >> (sizeof(T) * 8 - amt);
 }
