@@ -241,7 +241,7 @@ __attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
   int32_t dy = *clip_vc_y - vc_y;
   int32_t dx = *clip_vc_x - vc_x;
   if (*clip_vc_x < -x_bound) {
-    *clip_vc_y += (-x_bound) * dy / dx;
+    *clip_vc_y += (-x_bound - *clip_vc_x) * dy / dx;
     *clip_vc_x = -x_bound;
   }
   if (*clip_vc_x > x_bound) {
