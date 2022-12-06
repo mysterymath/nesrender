@@ -40,6 +40,7 @@ constexpr uint16_t speed = 10;
 constexpr uint16_t ang_speed = 1000;
 
 uint16_t scale = 100;
+uint16_t scale_recip = (uint32_t)65536 / scale;
 
 // Percent
 constexpr uint16_t scale_speed = 10;
@@ -70,10 +71,13 @@ int main() {
       else if (pad & PAD_RIGHT)
         player_ang -= ang_speed;
       if (pad & PAD_A) {
-        if (pad & PAD_UP)
+        if (pad & PAD_UP) {
           scale = (uint32_t)scale * (100 - scale_speed) / 100;
-        else if (pad & PAD_DOWN)
+          scale_recip = (uint32_t)scale_recip * (100 + scale_speed) / 100;
+        } else if (pad & PAD_DOWN) {
           scale = (uint32_t)scale * (100 + scale_speed) / 100;
+          scale_recip = (uint32_t)scale_recip * (100 - scale_speed) / 100;
+        }
       } else {
         int16_t vec_x = cosi(player_ang) * speed / 65536;
         int16_t vec_y = sine(player_ang) * speed / 65536;
@@ -156,7 +160,7 @@ int16_t cur_vc_y;
 
 template <typename T> T abs(T t) { return t < 0 ? -t : t; }
 
-void overhead_wall_move_to(uint16_t x, uint16_t y) {
+__attribute__((noinline)) void overhead_wall_move_to(uint16_t x, uint16_t y) {
   to_vc(x, y, &cur_vc_x, &cur_vc_y);
   if (on_screen(cur_vc_x, cur_vc_y)) {
     int16_t sx, sy;
@@ -165,7 +169,7 @@ void overhead_wall_move_to(uint16_t x, uint16_t y) {
   }
 }
 
-void overhead_wall_draw_to(uint16_t x, uint16_t y) {
+__attribute__((noinline)) void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   int16_t vc_x, vc_y;
   to_vc(x, y, &vc_x, &vc_y);
 
@@ -195,7 +199,8 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   line_draw_to(3, sx, sy);
 }
 
-void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
+__attribute__((noinline)) void to_vc(uint16_t x, uint16_t y, int16_t *vc_x,
+                                     int16_t *vc_y) {
   int16_t tx = x - player_x;
   int16_t ty = y - player_y;
   // The player is facing up in the overhead view.
@@ -206,14 +211,14 @@ void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
   *vc_y = s * tx / 65536 + c * ty / 65536;
 }
 
-bool on_screen(int16_t vc_x, int16_t vc_y) {
+__attribute__((noinline)) bool on_screen(int16_t vc_x, int16_t vc_y) {
   int16_t x_bound = scale;
   int16_t y_bound = scale * height / width;
   return abs(vc_x) <= x_bound && abs(vc_y) <= y_bound;
 }
 
-bool line_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
-                    int16_t vc_y2) {
+__attribute__((noinline)) bool line_on_screen(int16_t vc_x1, int16_t vc_y1,
+                                              int16_t vc_x2, int16_t vc_y2) {
   int16_t x_bound = scale;
   int16_t y_bound = scale * height / width;
 
@@ -228,7 +233,8 @@ bool line_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
   return true;
 }
 
-void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y) {
+__attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
+                                    int16_t *clip_vc_x, int16_t *clip_vc_y) {
   int16_t x_bound = scale;
   int16_t y_bound = scale * height / width;
 
@@ -252,9 +258,10 @@ void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y) {
   }
 }
 
-void to_screen(int16_t vc_x, int16_t vc_y, int16_t *sx, int16_t *sy) {
-  *sx = (int32_t)vc_x * 256 * width / 2 / scale  + width/2 * 256;
-  *sy = height/2 * 256 - (int32_t)vc_y * 256 * width / 2 / scale;
+__attribute__((noinline)) void to_screen(int16_t vc_x, int16_t vc_y,
+                                         int16_t *sx, int16_t *sy) {
+  *sx = ((int32_t)vc_x * 256 * width / 2 * scale_recip >> 16) + width / 2 * 256;
+  *sy = height / 2 * 256 - ((int32_t)vc_y * 256 * width / 2 * scale_recip >> 16);
 }
 
 extern "C" void __putchar(char c) { POKE(0x4018, c); }
