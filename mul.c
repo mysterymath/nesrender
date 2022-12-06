@@ -24,13 +24,17 @@ static unsigned qs_16(char n, bool hi) {
 char half_mul_8(char a, char b) {
   if (a < b)
     return half_mul_8(b, a);
-  return qs_8(a + b, a & 1 && b & 1) - qs_8(a - b, false);
+  char sum;
+  bool carry = __builtin_add_overflow(a, b, &sum);
+  return qs_8(sum, carry) - qs_8(a - b, false);
 }
 
 unsigned full_mul_8(char a, char b) {
   if (a < b)
     return full_mul_8(b, a);
-  return qs_16(a + b, a & 1 && b & 1) - qs_16(a - b, false);
+  char sum;
+  bool carry = __builtin_add_overflow(a, b, &sum);
+  return qs_16(sum, carry) - qs_16(a - b, false);
 }
 
 unsigned mul_hi(unsigned a, unsigned b) {

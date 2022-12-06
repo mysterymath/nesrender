@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mul.h"
 #include "trig.h"
 
 // Configure for SNROM MMC1 board.
