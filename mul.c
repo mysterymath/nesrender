@@ -43,8 +43,8 @@ unsigned mul_hi(unsigned a, unsigned b) {
   // =========================================
   //                a_hi * b_lo   a_lo * b_lo
   //   a_hi * b_hi  a_lo * b_hi
-
   // The low part can only affect the answer by 1, so skip it.
-  return (half_mul_8(a >> 8, b >> 8) << 8) + full_mul_8(a >> 8, b & 0xff) +
-         full_mul_8(a & 0xff, b >> 8);
+
+  return full_mul_8(a >> 8, b >> 8) +
+         ((full_mul_8(a >> 8, b) + full_mul_8(a, b >> 8)) >> 8);
 }
