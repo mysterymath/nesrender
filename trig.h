@@ -12,10 +12,8 @@ extern "C" {
 #define PI3_OVER_2 (65536 / 4 * 3)
 #define PI2 65536
 
-int32_t sine(unsigned angle);
-int32_t cosi(unsigned angle);
-int mul_sin(unsigned angle, int val);
-int mul_cos(unsigned angle, int val);
+int16_t mul_sin(uint16_t angle, int16_t val);
+int16_t mul_cos(uint16_t angle, int16_t val);
 
 #ifdef __cplusplus
 }

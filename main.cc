@@ -80,8 +80,8 @@ int main() {
           scale_recip = (uint32_t)scale_recip * (100 - scale_speed) / 100;
         }
       } else {
-        int16_t vec_x = cosi(player_ang) * speed / 65536;
-        int16_t vec_y = sine(player_ang) * speed / 65536;
+        int16_t vec_x = mul_cos(player_ang, speed);
+        int16_t vec_y = mul_sin(player_ang, speed);
         if (pad & PAD_UP) {
           player_x += vec_x;
           player_y += vec_y;
@@ -206,10 +206,8 @@ __attribute__((noinline)) void to_vc(uint16_t x, uint16_t y, int16_t *vc_x,
   int16_t ty = y - player_y;
   // The player is facing up in the overhead view.
   uint16_t ang = PI_OVER_2 - player_ang;
-  int32_t c = cosi(ang);
-  int32_t s = sine(ang);
-  *vc_x = c * tx / 65536 - s * ty / 65536;
-  *vc_y = s * tx / 65536 + c * ty / 65536;
+  *vc_x = mul_cos(ang, tx) - mul_sin(ang, ty);
+  *vc_y = mul_sin(ang, tx) + mul_cos(ang, ty);
 }
 
 __attribute__((noinline)) bool on_screen(int16_t vc_x, int16_t vc_y) {
