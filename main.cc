@@ -70,10 +70,10 @@ int main() {
     if (pad & PAD_B) {
       if (pad & PAD_UP) {
         scale = (uint32_t)scale * (100 - scale_speed) / 100;
-        scale_recip = (uint32_t)scale_recip * (100 + scale_speed) / 100;
+        scale_recip = (uint32_t)65536 / scale;
       } else if (pad & PAD_DOWN) {
         scale = (uint32_t)scale * (100 + scale_speed) / 100;
-        scale_recip = (uint32_t)scale_recip * (100 - scale_speed) / 100;
+        scale_recip = (uint32_t)65536 / scale;
       }
     } else {
       if (pad & PAD_UP) {
