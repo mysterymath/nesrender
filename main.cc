@@ -18,20 +18,20 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-#pragma clang section bss = ".prg_ram_0"
-char fb_cur[960];
-char fb_next[960];
-#pragma clang section bss = ""
-
 char corner_x = 30;
 char corner_y_top = 10;
 char corner_y_bot = 40;
 bool control_top;
 
-bool still_presenting;
+constexpr uint16_t width = 64;
+constexpr uint16_t height = 60;
 
-void render();
-void present();
+uint16_t wc_width = 100;
+uint16_t wc_width_recip = (uint32_t)65536 / wc_width;
+uint16_t wc_height = wc_width * height / width;
+
+// Percent
+constexpr uint16_t scale_speed = 10;
 
 uint16_t player_x = 150;
 uint16_t player_y = 150;
@@ -40,14 +40,10 @@ uint16_t player_ang = 0;
 constexpr uint16_t speed = 10;
 constexpr uint16_t ang_speed = 2048;
 
-uint16_t scale = 100;
-uint16_t scale_recip = (uint32_t)65536 / scale;
+bool still_presenting;
 
-// Percent
-constexpr uint16_t scale_speed = 10;
-
-constexpr uint16_t width = 64;
-constexpr uint16_t height = 60;
+void render();
+void present();
 
 int main() {
   static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
@@ -69,11 +65,11 @@ int main() {
     char pad = pad_state(0);
     if (pad & PAD_B) {
       if (pad & PAD_UP) {
-        scale = (uint32_t)scale * (100 - scale_speed) / 100;
-        scale_recip = (uint32_t)65536 / scale;
+        wc_width = (uint32_t)wc_width * (100 - scale_speed) / 100;
+        wc_width_recip = (uint32_t)wc_width_recip * (100 + scale_speed) / 100;
       } else if (pad & PAD_DOWN) {
-        scale = (uint32_t)scale * (100 + scale_speed) / 100;
-        scale_recip = (uint32_t)65536 / scale;
+        wc_width = (uint32_t)wc_width * (100 + scale_speed) / 100;
+        wc_width_recip = (uint32_t)wc_width_recip * (100 - scale_speed) / 100;
       }
     } else {
       if (pad & PAD_UP) {
@@ -114,6 +110,11 @@ void wall_draw_to(char color, char x, char y_top, char y_bot);
 
 void overhead_wall_move_to(uint16_t x, uint16_t y);
 void overhead_wall_draw_to(uint16_t x, uint16_t y);
+
+#pragma clang section bss = ".prg_ram_0"
+char fb_cur[960];
+char fb_next[960];
+#pragma clang section bss = ""
 
 __attribute__((noinline, no_builtin("memset"))) void clear_screen() {
   for (int i = 0; i < 256; i++) {
@@ -204,15 +205,15 @@ __attribute__((noinline)) void to_vc(uint16_t x, uint16_t y, int16_t *vc_x,
 }
 
 __attribute__((noinline)) bool on_screen(int16_t vc_x, int16_t vc_y) {
-  int16_t x_bound = scale;
-  int16_t y_bound = scale * height / width;
+  int16_t x_bound = wc_width;
+  int16_t y_bound = wc_height;
   return abs(vc_x) <= x_bound && abs(vc_y) <= y_bound;
 }
 
 __attribute__((noinline)) bool line_on_screen(int16_t vc_x1, int16_t vc_y1,
                                               int16_t vc_x2, int16_t vc_y2) {
-  int16_t x_bound = scale;
-  int16_t y_bound = scale * height / width;
+  int16_t x_bound = wc_width;
+  int16_t y_bound = wc_height;
 
   if (vc_x1 < -x_bound && vc_x2 < -x_bound)
     return false;
@@ -227,8 +228,8 @@ __attribute__((noinline)) bool line_on_screen(int16_t vc_x1, int16_t vc_y1,
 
 __attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
                                     int16_t *clip_vc_x, int16_t *clip_vc_y) {
-  int16_t x_bound = scale;
-  int16_t y_bound = scale * height / width;
+  int16_t x_bound = wc_width;
+  int16_t y_bound = wc_height;
 
   int32_t dy = *clip_vc_y - vc_y;
   int32_t dx = *clip_vc_x - vc_x;
@@ -252,9 +253,10 @@ __attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
 
 __attribute__((noinline)) void to_screen(int16_t vc_x, int16_t vc_y,
                                          int16_t *sx, int16_t *sy) {
-  *sx = ((int32_t)vc_x * 256 * width / 2 * scale_recip >> 16) + width / 2 * 256;
-  *sy =
-      height / 2 * 256 - ((int32_t)vc_y * 256 * width / 2 * scale_recip >> 16);
+  *sx = ((int32_t)vc_x * 256 * width / 2 * wc_width_recip >> 16) +
+        width / 2 * 256;
+  *sy = height / 2 * 256 -
+        ((int32_t)vc_y * 256 * width / 2 * wc_width_recip >> 16);
 }
 
 extern "C" void __putchar(char c) { POKE(0x4018, c); }
