@@ -61,8 +61,6 @@ int main() {
   init_present();
 
   while (true) {
-    ppu_wait_nmi();
-
     char pad_t = pad_trigger(0);
     char pad = pad_state(0);
     if (pad & PAD_B) {
@@ -408,12 +406,12 @@ volatile unsigned max_updates_per_frame = 0;
 volatile char vram_buf[1025];
 #pragma clang section bss = ""
 
-volatile bool vram_buf_ready;
+volatile bool updating_vram;
 
 void init_present() {
   unsigned vbi = 0;
-  // NOP
-  vram_buf[vbi++] = 0xea;
+  // RTS
+  vram_buf[vbi++] = 0x60;
   for (int i = 0; i < sizeof(vram_buf) / 16; i++) {
     vram_buf[vbi++] = 0xa9;
     vram_buf[vbi++] = 0;
@@ -436,11 +434,14 @@ void init_present() {
     vram_buf[vbi++] = 0x07;
     vram_buf[vbi++] = 0x20;
     // NOP
-    vram_buf[vbi++] = 0xea;
+    vram_buf[vbi++] = 0x60;
   }
 }
 
 void present() {
+  if (updating_vram)
+    ppu_wait_nmi();
+
   unsigned vbi = 0;
 
   char *next_col = fb_next;
@@ -448,7 +449,6 @@ void present() {
   unsigned vram = NAMETABLE_A;
 
   still_presenting = false;
-  vram_buf_ready = false;
   char cur_color = 0;
   for (char x = 0; x < 32; x++, vram -= 959, next_col += 30, cur_col += 30) {
     for (char y = 0; y < 30; y++, vram += 32) {
@@ -474,7 +474,7 @@ void present() {
 done:
   // Make the last NOP an RTS.
   vram_buf[vbi] = 0x60;
-  vram_buf_ready = true;
+  updating_vram = true;
 }
 
 asm(".section .nmi.0,\"axR\"\n"
@@ -483,8 +483,9 @@ asm(".section .nmi.0,\"axR\"\n"
 extern volatile char VRAM_UPDATE;
 
 extern "C" void update_vram() {
-  if (!vram_buf_ready)
+  if (!updating_vram)
     return;
   asm("jsr vram_buf");
   VRAM_UPDATE = 1;
+  updating_vram = false;
 }
