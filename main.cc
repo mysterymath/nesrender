@@ -43,6 +43,7 @@ constexpr uint16_t ang_speed = 2048;
 bool still_presenting;
 
 void render();
+void init_present();
 void present();
 
 int main() {
@@ -57,6 +58,7 @@ int main() {
   ppu_on_all();
 
   oam_spr(128 - 4, 120 - 4, 0, 0);
+  init_present();
 
   while (true) {
     ppu_wait_nmi();
@@ -394,10 +396,40 @@ void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
 volatile unsigned max_updates_per_frame = 0;
 
 #pragma clang section bss = ".prg_ram_0"
-volatile char vram_buf[1024];
+volatile char vram_buf[1025];
 #pragma clang section bss = ""
 
 volatile bool vram_buf_ready;
+
+void init_present() {
+  unsigned vbi = 0;
+  // NOP
+  vram_buf[vbi++] = 0xea;
+  for (int i = 0; i < sizeof(vram_buf) / 16; i++) {
+    vram_buf[vbi++] = 0xa9;
+    vram_buf[vbi++] = 0;
+    // STA PPUADDR
+    vram_buf[vbi++] = 0x8d;
+    vram_buf[vbi++] = 0x06;
+    vram_buf[vbi++] = 0x20;
+    // LDA #<vram
+    vram_buf[vbi++] = 0xa9;
+    vram_buf[vbi++] = 0;
+    // STA PPUADDR
+    vram_buf[vbi++] = 0x8d;
+    vram_buf[vbi++] = 0x06;
+    vram_buf[vbi++] = 0x20;
+    // LDA #color
+    vram_buf[vbi++] = 0xa9;
+    vram_buf[vbi++] = 0;
+    // STA PPUDATA
+    vram_buf[vbi++] = 0x8d;
+    vram_buf[vbi++] = 0x07;
+    vram_buf[vbi++] = 0x20;
+    // NOP
+    vram_buf[vbi++] = 0xea;
+  }
+}
 
 void present() {
   unsigned vbi = 0;
@@ -414,36 +446,24 @@ void present() {
       if (next_col[y] == cur_col[y])
         continue;
 
-      if (vbi + 16 >= sizeof(vram_buf)) {
+      if (vbi == sizeof(vram_buf) - 1) {
         still_presenting = true;
         goto done;
       }
-      // LDA #>vram
-      vram_buf[vbi++] = 0xa9;
-      vram_buf[vbi++] = vram >> 8;
-      // STA PPUADDR
-      vram_buf[vbi++] = 0x8d;
-      vram_buf[vbi++] = 0x06;
-      vram_buf[vbi++] = 0x20;
-      // LDA #<vram
-      vram_buf[vbi++] = 0xa9;
-      vram_buf[vbi++] = vram & 0xff;
-      // STA PPUADDR
-      vram_buf[vbi++] = 0x8d;
-      vram_buf[vbi++] = 0x06;
-      vram_buf[vbi++] = 0x20;
-      // LDA #color
-      vram_buf[vbi++] = 0xa9;
-      vram_buf[vbi++] = next_col[y];
-      // STA PPUDATA
-      vram_buf[vbi++] = 0x8d;
-      vram_buf[vbi++] = 0x07;
-      vram_buf[vbi++] = 0x20;
+      // Make any preexising RTS a NOP instead.
+      vram_buf[vbi] = 0xea;
+      vbi += 2;
+      vram_buf[vbi] = vram >> 8;
+      vbi += 5;
+      vram_buf[vbi] = vram & 0xff;
+      vbi += 5;
+      vram_buf[vbi] = next_col[y];
+      vbi += 4;
       cur_col[y] = next_col[y];
     }
   }
 done:
-  // RTS
+  // Make the last NOP an RTS.
   vram_buf[vbi] = 0x60;
   vram_buf_ready = true;
 }
