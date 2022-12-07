@@ -37,8 +37,8 @@ uint16_t player_x = 150;
 uint16_t player_y = 150;
 uint16_t player_ang = 0;
 
-constexpr uint16_t speed = 10;
-constexpr uint16_t ang_speed = 2048;
+constexpr uint16_t speed = 5;
+constexpr uint16_t ang_speed = 1024;
 
 bool still_presenting;
 
@@ -442,15 +442,19 @@ void present() {
   if (updating_vram)
     ppu_wait_nmi();
 
+  static uint8_t x;
+  static uint8_t *next_col;
+  static uint8_t *cur_col;
+  static uint16_t vram_col;
+  if (!still_presenting) {
+    x = 0;
+    next_col = fb_next;
+    cur_col = fb_cur;
+    vram_col = NAMETABLE_A;
+  }
+
   uint16_t vbi = 0;
-
-  uint8_t *next_col = fb_next;
-  uint8_t *cur_col = fb_cur;
-  uint16_t vram_col = NAMETABLE_A;
-
-  still_presenting = false;
-  uint8_t cur_color = 0;
-  for (uint8_t x = 0; x < 32; x++, next_col += 30, cur_col += 30, vram_col++) {
+  for (; x < 32; x++, next_col += 30, cur_col += 30, vram_col++) {
     for (uint8_t y = 0; y < 30; y++) {
       if (next_col[y] == cur_col[y])
         continue;
@@ -458,6 +462,7 @@ void present() {
       uint16_t vram = vram_col + y * 32;
       if (vbi == sizeof(vram_buf) - 1) {
         still_presenting = true;
+        ++y;
         goto done;
       }
       // Make any preexising RTS a NOP instead.
@@ -472,6 +477,7 @@ void present() {
       cur_col[y] = next_col[y];
     }
   }
+  still_presenting = false;
 done:
   // Make the last NOP an RTS.
   vram_buf[vbi] = 0x60;
