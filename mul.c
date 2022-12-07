@@ -8,12 +8,12 @@ extern const char qs_256_511_lo[];
 extern const char qs_256_511_hi[];
 
 // (char)floor(n^2/4)
-static unsigned qs_8(char n, bool hi) {
+static uint16_t qs_8(uint8_t n, bool hi) {
   return hi ? qs_256_511_lo[n] : qs_0_255_lo[n];
 }
 
 // floor(n^2/4)
-static unsigned qs_16(char n, bool hi) {
+static uint16_t qs_16(uint8_t n, bool hi) {
   if (hi)
     return qs_256_511_hi[n] << 8 | qs_256_511_lo[n];
   return qs_0_255_hi[n] << 8 | qs_0_255_lo[n];
@@ -21,23 +21,23 @@ static unsigned qs_16(char n, bool hi) {
 
 // Quarter-square multiplication is used for the below.
 
-char half_mul_8(char a, char b) {
+uint8_t half_mul_8(uint8_t a, uint8_t b) {
   if (a < b)
     return half_mul_8(b, a);
-  char sum;
+  uint8_t sum;
   bool carry = __builtin_add_overflow(a, b, &sum);
   return qs_8(sum, carry) - qs_8(a - b, false);
 }
 
-unsigned full_mul_8(char a, char b) {
+uint16_t full_mul_8(uint8_t a, uint8_t b) {
   if (a < b)
     return full_mul_8(b, a);
-  char sum;
+  uint8_t sum;
   bool carry = __builtin_add_overflow(a, b, &sum);
   return qs_16(sum, carry) - qs_16(a - b, false);
 }
 
-unsigned mul_hi(unsigned a, unsigned b) {
+uint16_t mul_hi(uint16_t a, uint16_t b) {
   //                a_hi          a_lo
   // x              b_hi          b_lo
   // =========================================

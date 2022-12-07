@@ -18,9 +18,9 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-char corner_x = 30;
-char corner_y_top = 10;
-char corner_y_bot = 40;
+uint8_t corner_x = 30;
+uint8_t corner_y_top = 10;
+uint8_t corner_y_bot = 40;
 bool control_top;
 
 constexpr uint16_t width = 64;
@@ -47,8 +47,8 @@ void init_present();
 void present();
 
 int main() {
-  static const char bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
-  static const char spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
+  static const uint8_t bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};
+  static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
   pal_bright(4);
@@ -61,8 +61,8 @@ int main() {
   init_present();
 
   while (true) {
-    char pad_t = pad_trigger(0);
-    char pad = pad_state(0);
+    uint8_t pad_t = pad_trigger(0);
+    uint8_t pad = pad_state(0);
     if (pad & PAD_B) {
       if (pad & PAD_UP) {
         wc_width = (uint32_t)wc_width * (100 - scale_speed) / 100;
@@ -107,15 +107,15 @@ int main() {
 void line_move_to(uint16_t x, uint16_t y);
 void line_draw_to(uint8_t color, uint16_t x, uint16_t y);
 
-void wall_move_to(char x, char y_top, char y_bot);
-void wall_draw_to(char color, char x, char y_top, char y_bot);
+void wall_move_to(uint8_t x, uint8_t y_top, uint8_t y_bot);
+void wall_draw_to(uint8_t color, uint8_t x, uint8_t y_top, uint8_t y_bot);
 
 void overhead_wall_move_to(uint16_t x, uint16_t y);
 void overhead_wall_draw_to(uint16_t x, uint16_t y);
 
 #pragma clang section bss = ".prg_ram_0"
-char fb_cur[960];
-char fb_next[960];
+uint8_t fb_cur[960];
+uint8_t fb_next[960];
 #pragma clang section bss = ""
 
 __attribute__((no_builtin("memset"))) void clear_screen() {
@@ -124,7 +124,7 @@ __attribute__((no_builtin("memset"))) void clear_screen() {
     (fb_next + 256)[i] = 0;
     (fb_next + 512)[i] = 0;
   }
-  for (char i = 0; i < 192; i++)
+  for (uint8_t i = 0; i < 192; i++)
     (fb_next + 768)[i] = 0;
 }
 
@@ -320,32 +320,32 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
   line_cur_y = to_y;
 }
 
-char cur_x;
-char cur_y_top;
-char cur_y_bot;
+uint8_t cur_x;
+uint8_t cur_y_top;
+uint8_t cur_y_bot;
 
-void wall_move_to(char x, char y_top, char y_bot) {
+void wall_move_to(uint8_t x, uint8_t y_top, uint8_t y_bot) {
   cur_x = x;
   cur_y_top = y_top;
   cur_y_bot = y_bot;
 }
 
 template <bool x_odd>
-void draw_vert_wall(char color, char *col, char y_top, char y_bot);
+void draw_vert_wall(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot);
 
-void wall_draw_to(char color, char x, char y_top, char y_bot) {
-  char dx = x - cur_x;
-  signed char dy_top = y_top - cur_y_top;
-  signed char dy_bot = y_bot - cur_y_bot;
+void wall_draw_to(uint8_t color, uint8_t x, uint8_t y_top, uint8_t y_bot) {
+  uint8_t dx = x - cur_x;
+  int8_t dy_top = y_top - cur_y_top;
+  int8_t dy_bot = y_bot - cur_y_bot;
   // Values in 8.8 fixed point
   int m_top = dy_top * 256 / dx;
   int m_bot = dy_bot * 256 / dx;
 
-  unsigned y_top_fp = cur_y_top << 8;
-  unsigned y_bot_fp = cur_y_bot << 8;
+  uint16_t y_top_fp = cur_y_top << 8;
+  uint16_t y_bot_fp = cur_y_bot << 8;
 
-  char *fb_col = &fb_next[cur_x / 2 * 30];
-  for (char draw_x = cur_x; draw_x < x; ++draw_x) {
+  uint8_t *fb_col = &fb_next[cur_x / 2 * 30];
+  for (uint8_t draw_x = cur_x; draw_x < x; ++draw_x) {
     if (draw_x & 1) {
       draw_vert_wall<true>(3, fb_col, 0, y_top_fp / 256);
       draw_vert_wall<true>(color, fb_col, y_top_fp / 256, y_bot_fp / 256);
@@ -365,10 +365,10 @@ void wall_draw_to(char color, char x, char y_top, char y_bot) {
 }
 
 template <bool x_odd>
-void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
+void draw_vert_wall(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot) {
   if (y_top >= y_bot)
     return;
-  char i = y_top / 2;
+  uint8_t i = y_top / 2;
   if (y_top & 1) {
     if (x_odd) {
       col[i] &= 0b00111111;
@@ -400,16 +400,16 @@ void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
   }
 }
 
-volatile unsigned max_updates_per_frame = 0;
+volatile uint16_t max_updates_per_frame = 0;
 
 #pragma clang section bss = ".prg_ram_0"
-volatile char vram_buf[1025];
+volatile uint8_t vram_buf[1025];
 #pragma clang section bss = ""
 
 volatile bool updating_vram;
 
 void init_present() {
-  unsigned vbi = 0;
+  uint16_t vbi = 0;
   // RTS
   vram_buf[vbi++] = 0x60;
   for (int i = 0; i < sizeof(vram_buf) / 16; i++) {
@@ -442,16 +442,16 @@ void present() {
   if (updating_vram)
     ppu_wait_nmi();
 
-  unsigned vbi = 0;
+  uint16_t vbi = 0;
 
-  char *next_col = fb_next;
-  char *cur_col = fb_cur;
+  uint8_t *next_col = fb_next;
+  uint8_t *cur_col = fb_cur;
   uint16_t vram_col = NAMETABLE_A;
 
   still_presenting = false;
-  char cur_color = 0;
-  for (char x = 0; x < 32; x++, next_col += 30, cur_col += 30, vram_col++) {
-    for (char y = 0; y < 30; y++) {
+  uint8_t cur_color = 0;
+  for (uint8_t x = 0; x < 32; x++, next_col += 30, cur_col += 30, vram_col++) {
+    for (uint8_t y = 0; y < 30; y++) {
       if (next_col[y] == cur_col[y])
         continue;
 
@@ -481,7 +481,7 @@ done:
 asm(".section .nmi.0,\"axR\"\n"
     "\tjsr update_vram\n");
 
-extern volatile char VRAM_UPDATE;
+extern volatile uint8_t VRAM_UPDATE;
 
 extern "C" void update_vram() {
   if (!updating_vram)
