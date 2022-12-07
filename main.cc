@@ -446,15 +446,16 @@ void present() {
 
   char *next_col = fb_next;
   char *cur_col = fb_cur;
-  unsigned vram = NAMETABLE_A;
+  uint16_t vram_col = NAMETABLE_A;
 
   still_presenting = false;
   char cur_color = 0;
-  for (char x = 0; x < 32; x++, vram -= 959, next_col += 30, cur_col += 30) {
-    for (char y = 0; y < 30; y++, vram += 32) {
+  for (char x = 0; x < 32; x++, next_col += 30, cur_col += 30, vram_col++) {
+    for (char y = 0; y < 30; y++) {
       if (next_col[y] == cur_col[y])
         continue;
 
+      uint16_t vram = vram_col + y * 32;
       if (vbi == sizeof(vram_buf) - 1) {
         still_presenting = true;
         goto done;
