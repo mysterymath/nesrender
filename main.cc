@@ -67,9 +67,11 @@ int main() {
       if (pad & PAD_UP) {
         wc_width = (uint32_t)wc_width * (100 - scale_speed) / 100;
         wc_width_recip = (uint32_t)wc_width_recip * (100 + scale_speed) / 100;
+        wc_height = wc_width * height / width;
       } else if (pad & PAD_DOWN) {
         wc_width = (uint32_t)wc_width * (100 + scale_speed) / 100;
         wc_width_recip = (uint32_t)wc_width_recip * (100 - scale_speed) / 100;
+        wc_height = wc_width * height / width;
       }
     } else {
       if (pad & PAD_UP) {
@@ -116,7 +118,7 @@ char fb_cur[960];
 char fb_next[960];
 #pragma clang section bss = ""
 
-__attribute__((noinline, no_builtin("memset"))) void clear_screen() {
+__attribute__((no_builtin("memset"))) void clear_screen() {
   for (int i = 0; i < 256; i++) {
     fb_next[i] = 0;
     (fb_next + 256)[i] = 0;
@@ -155,7 +157,7 @@ int16_t cur_vc_y;
 
 template <typename T> T abs(T t) { return t < 0 ? -t : t; }
 
-__attribute__((noinline)) void overhead_wall_move_to(uint16_t x, uint16_t y) {
+void overhead_wall_move_to(uint16_t x, uint16_t y) {
   to_vc(x, y, &cur_vc_x, &cur_vc_y);
   if (on_screen(cur_vc_x, cur_vc_y)) {
     int16_t sx, sy;
@@ -164,7 +166,7 @@ __attribute__((noinline)) void overhead_wall_move_to(uint16_t x, uint16_t y) {
   }
 }
 
-__attribute__((noinline)) void overhead_wall_draw_to(uint16_t x, uint16_t y) {
+void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   int16_t vc_x, vc_y;
   to_vc(x, y, &vc_x, &vc_y);
 
@@ -194,8 +196,7 @@ __attribute__((noinline)) void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   line_draw_to(3, sx, sy);
 }
 
-__attribute__((noinline)) void to_vc(uint16_t x, uint16_t y, int16_t *vc_x,
-                                     int16_t *vc_y) {
+void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
   int16_t tx = x - player_x;
   int16_t ty = y - player_y;
   // The player is facing up in the overhead view.
@@ -204,14 +205,14 @@ __attribute__((noinline)) void to_vc(uint16_t x, uint16_t y, int16_t *vc_x,
   *vc_y = mul_sin(ang, tx) + mul_cos(ang, ty);
 }
 
-__attribute__((noinline)) bool on_screen(int16_t vc_x, int16_t vc_y) {
+bool on_screen(int16_t vc_x, int16_t vc_y) {
   int16_t x_bound = wc_width;
   int16_t y_bound = wc_height;
   return abs(vc_x) <= x_bound && abs(vc_y) <= y_bound;
 }
 
-__attribute__((noinline)) bool line_on_screen(int16_t vc_x1, int16_t vc_y1,
-                                              int16_t vc_x2, int16_t vc_y2) {
+bool line_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
+                    int16_t vc_y2) {
   int16_t x_bound = wc_width;
   int16_t y_bound = wc_height;
 
@@ -226,8 +227,7 @@ __attribute__((noinline)) bool line_on_screen(int16_t vc_x1, int16_t vc_y1,
   return true;
 }
 
-__attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
-                                    int16_t *clip_vc_x, int16_t *clip_vc_y) {
+void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y) {
   int16_t x_bound = wc_width;
   int16_t y_bound = wc_height;
 
@@ -251,8 +251,7 @@ __attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
   }
 }
 
-__attribute__((noinline)) void to_screen(int16_t vc_x, int16_t vc_y,
-                                         int16_t *sx, int16_t *sy) {
+void to_screen(int16_t vc_x, int16_t vc_y, int16_t *sx, int16_t *sy) {
   *sx = ((int32_t)vc_x * 256 * width / 2 * wc_width_recip >> 16) +
         width / 2 * 256;
   *sy = height / 2 * 256 -
@@ -403,18 +402,17 @@ volatile bool vram_buf_ready;
 void present() {
   unsigned vbi = 0;
 
-  char *next = fb_next;
-  char *cur = fb_cur;
+  char *next_col = fb_next;
+  char *cur_col = fb_cur;
   unsigned vram = NAMETABLE_A;
 
   still_presenting = false;
   vram_buf_ready = false;
   char cur_color = 0;
-  for (char x = 0; x < 32; x++, vram -= 959) {
-    for (char y = 0; y < 30; y++, next++, cur++, vram += 32) {
-      if (*next == *cur) {
+  for (char x = 0; x < 32; x++, vram -= 959, next_col += 30, cur_col += 30) {
+    for (char y = 0; y < 30; y++, vram += 32) {
+      if (next_col[y] == cur_col[y])
         continue;
-      }
 
       if (vbi + 16 >= sizeof(vram_buf)) {
         still_presenting = true;
@@ -436,12 +434,12 @@ void present() {
       vram_buf[vbi++] = 0x20;
       // LDA #color
       vram_buf[vbi++] = 0xa9;
-      vram_buf[vbi++] = *next;
+      vram_buf[vbi++] = next_col[y];
       // STA PPUDATA
       vram_buf[vbi++] = 0x8d;
       vram_buf[vbi++] = 0x07;
       vram_buf[vbi++] = 0x20;
-      *cur = *next;
+      cur_col[y] = next_col[y];
     }
   }
 done:
