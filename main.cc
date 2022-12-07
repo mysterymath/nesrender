@@ -64,10 +64,6 @@ int main() {
 
   while (true) {
     ppu_wait_nmi();
-    if (still_presenting) {
-      present();
-      continue;
-    }
 
     char pad_t = pad_trigger(0);
     char pad = pad_state(0);
@@ -102,7 +98,9 @@ int main() {
           player_ang -= ang_speed;
       }
     }
-    render();
+
+    if (!still_presenting)
+      render();
     present();
   }
 }
@@ -120,11 +118,11 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y);
 __attribute__((noinline, no_builtin("memset"))) void clear_screen() {
   for (int i = 0; i < 256; i++) {
     fb_next[i] = 0;
-    (fb_next+256)[i] = 0;
-    (fb_next+512)[i] = 0;
+    (fb_next + 256)[i] = 0;
+    (fb_next + 512)[i] = 0;
   }
   for (char i = 0; i < 192; i++)
-    (fb_next+768)[i] = 0;
+    (fb_next + 768)[i] = 0;
 }
 
 void render() {
