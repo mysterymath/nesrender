@@ -38,7 +38,7 @@ uint16_t player_y = 150;
 uint16_t player_ang = 0;
 
 constexpr uint16_t speed = 10;
-constexpr uint16_t ang_speed = 1000;
+constexpr uint16_t ang_speed = 360;
 
 uint16_t scale = 100;
 uint16_t scale_recip = (uint32_t)65536 / scale;
@@ -64,60 +64,45 @@ int main() {
 
   while (true) {
     ppu_wait_nmi();
-    if (!still_presenting) {
-      char pad_t = pad_trigger(0);
-      char pad = pad_state(0);
-      if (pad & PAD_LEFT)
-        player_ang += ang_speed;
-      else if (pad & PAD_RIGHT)
-        player_ang -= ang_speed;
+    if (still_presenting) {
+      present();
+      continue;
+    }
+
+    char pad_t = pad_trigger(0);
+    char pad = pad_state(0);
+    if (pad & PAD_B) {
+      if (pad & PAD_UP) {
+        scale = (uint32_t)scale * (100 - scale_speed) / 100;
+        scale_recip = (uint32_t)scale_recip * (100 + scale_speed) / 100;
+      } else if (pad & PAD_DOWN) {
+        scale = (uint32_t)scale * (100 + scale_speed) / 100;
+        scale_recip = (uint32_t)scale_recip * (100 - scale_speed) / 100;
+      }
+    } else {
+      if (pad & PAD_UP) {
+        player_x += mul_cos(player_ang, speed);
+        player_y += mul_sin(player_ang, speed);
+      } else if (pad & PAD_DOWN) {
+        player_x += mul_cos(player_ang + PI, speed);
+        player_y += mul_sin(player_ang + PI, speed);
+      }
       if (pad & PAD_A) {
-        if (pad & PAD_UP) {
-          scale = (uint32_t)scale * (100 - scale_speed) / 100;
-          scale_recip = (uint32_t)scale_recip * (100 + scale_speed) / 100;
-        } else if (pad & PAD_DOWN) {
-          scale = (uint32_t)scale * (100 + scale_speed) / 100;
-          scale_recip = (uint32_t)scale_recip * (100 - scale_speed) / 100;
+        if (pad & PAD_LEFT) {
+          player_x += mul_cos(player_ang + PI_OVER_2, speed);
+          player_y += mul_sin(player_ang + PI_OVER_2, speed);
+        } else if (pad & PAD_RIGHT) {
+          player_x += mul_cos(player_ang - PI_OVER_2, speed);
+          player_y += mul_sin(player_ang - PI_OVER_2, speed);
         }
       } else {
-        int16_t vec_x = mul_cos(player_ang, speed);
-        int16_t vec_y = mul_sin(player_ang, speed);
-        if (pad & PAD_UP) {
-          player_x += vec_x;
-          player_y += vec_y;
-        } else if (pad & PAD_DOWN) {
-          player_x -= vec_x;
-          player_y -= vec_y;
-        }
+        if (pad & PAD_LEFT)
+          player_ang += ang_speed;
+        else if (pad & PAD_RIGHT)
+          player_ang -= ang_speed;
       }
-
-#if 0
-      if (pad & PAD_LEFT && corner_x >= 2)
-        corner_x -= 2;
-      else if (pad & PAD_RIGHT && corner_x <= 61)
-        corner_x += 2;
-      if (pad & PAD_UP) {
-        if (control_top) {
-          if (corner_y_top >= 2)
-            corner_y_top -= 2;
-        } else {
-          if (corner_y_bot >= 2)
-            corner_y_bot -= 2;
-        }
-      } else if (pad & PAD_DOWN) {
-        if (control_top) {
-          if (corner_y_top <= 57)
-            corner_y_top += 2;
-        } else {
-          if (corner_y_bot <= 57)
-            corner_y_bot += 2;
-        }
-      }
-      if (pad_t & PAD_A)
-        control_top = !control_top;
-#endif
-      render();
     }
+    render();
     present();
   }
 }
@@ -132,6 +117,16 @@ void wall_draw_to(char color, char x, char y_top, char y_bot);
 void overhead_wall_move_to(uint16_t x, uint16_t y);
 void overhead_wall_draw_to(uint16_t x, uint16_t y);
 
+__attribute__((noinline, no_builtin("memset"))) void clear_screen() {
+  for (int i = 0; i < 256; i++) {
+    fb_next[i] = 0;
+    (fb_next+256)[i] = 0;
+    (fb_next+512)[i] = 0;
+  }
+  for (char i = 0; i < 192; i++)
+    (fb_next+768)[i] = 0;
+}
+
 void render() {
 #if 0
   wall_move_to(0, 0, 59);
@@ -142,7 +137,7 @@ void render() {
   line_move_to(128, 128);
   line_draw_to(1, corner_x << 8 | 128, corner_y_bot << 8 | 128);
 #endif
-  memset(fb_next, 0, sizeof(fb_next));
+  clear_screen();
   overhead_wall_move_to(100, 100);
   overhead_wall_draw_to(100, 200);
   overhead_wall_draw_to(200, 200);
@@ -260,7 +255,8 @@ __attribute__((noinline)) void clip(int16_t vc_x, int16_t vc_y,
 __attribute__((noinline)) void to_screen(int16_t vc_x, int16_t vc_y,
                                          int16_t *sx, int16_t *sy) {
   *sx = ((int32_t)vc_x * 256 * width / 2 * scale_recip >> 16) + width / 2 * 256;
-  *sy = height / 2 * 256 - ((int32_t)vc_y * 256 * width / 2 * scale_recip >> 16);
+  *sy =
+      height / 2 * 256 - ((int32_t)vc_y * 256 * width / 2 * scale_recip >> 16);
 }
 
 extern "C" void __putchar(char c) { POKE(0x4018, c); }
@@ -399,7 +395,7 @@ void draw_vert_wall(char color, char *col, char y_top, char y_bot) {
 volatile unsigned max_updates_per_frame = 0;
 
 #pragma clang section bss = ".prg_ram_0"
-volatile char vram_buf[1500];
+volatile char vram_buf[1024];
 #pragma clang section bss = ""
 
 volatile bool vram_buf_ready;
