@@ -38,7 +38,7 @@ uint16_t player_y = 150;
 uint16_t player_ang = 0;
 
 constexpr uint16_t speed = 10;
-constexpr uint16_t ang_speed = 360;
+constexpr uint16_t ang_speed = 2048;
 
 uint16_t scale = 100;
 uint16_t scale_recip = (uint32_t)65536 / scale;
