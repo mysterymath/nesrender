@@ -10,7 +10,8 @@ extern const char sin_table_hi[];
 int16_t mul_sin(uint16_t angle, int16_t val) {
   if (angle < PI_OVER_2) {
     uint8_t i = (uint32_t)angle * 256 / PI_OVER_2;
-    return mul_hi(sin_table_hi[i] * 256 + sin_table_lo[i], val);
+    uint16_t s = sin_table_hi[i] * 256 + sin_table_lo[i];
+    return val < 0 ? -mul_hi(s, -val) : mul_hi(s, val);
   }
   if (angle == PI_OVER_2)
     return val;
