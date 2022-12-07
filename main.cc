@@ -299,13 +299,22 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
 
   uint16_t x = line_cur_x;
   uint16_t y = line_cur_y;
+  uint16_t offset = x / 256 / 2 * 30 + y / 256 / 2;
   while (x_major ? x / 256 != to_x / 256 : y / 256 != to_y / 256) {
     uint8_t shift = (x / 256 % 2 * 2 + y / 256 % 2) * 2;
     and_mask = rotl((uint8_t)0b11111100, shift);
     uint8_t or_mask = color << shift;
-    uint16_t offset = x / 256 / 2 * 30 + y / 256 / 2;
+    // TODO: Don't multiply for each drawn pixel!
     fb_next[offset] &= and_mask;
     fb_next[offset] |= or_mask;
+    if ((x + dx) / 256 / 2 > x / 256 / 2)
+      offset += 30;
+    else if ((x + dx) / 256 / 2 < x / 256 / 2)
+      offset -= 30;
+    if ((y + dy) / 256 / 2 > y / 256 / 2)
+      offset++;
+    else if ((y + dy) / 256 / 2 < y / 256 / 2)
+      offset--;
     x += dx;
     y += dy;
   }
