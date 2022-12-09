@@ -18,11 +18,6 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-uint8_t corner_x = 30;
-uint8_t corner_y_top = 10;
-uint8_t corner_y_bot = 40;
-bool control_top;
-
 constexpr uint16_t width = 64;
 constexpr uint16_t height = 60;
 
@@ -129,15 +124,6 @@ __attribute__((no_builtin("memset"))) void clear_screen() {
 }
 
 void render() {
-#if 0
-  wall_move_to(0, 0, 59);
-  wall_draw_to(1, corner_x, corner_y_top, corner_y_bot);
-  wall_draw_to(2, 65, 0, 59);
-#elif 0
-  memset(fb_next, 0, sizeof(fb_next));
-  line_move_to(128, 128);
-  line_draw_to(1, corner_x << 8 | 128, corner_y_bot << 8 | 128);
-#endif
   clear_screen();
   overhead_wall_move_to(100, 100);
   overhead_wall_draw_to(100, 200);
@@ -261,13 +247,11 @@ void to_screen(int16_t vc_x, int16_t vc_y, int16_t *sx, int16_t *sy) {
 extern "C" void __putchar(char c) { POKE(0x4018, c); }
 
 uint16_t line_cur_x;
-// uint8_t *line_cur_fb_x;
 uint16_t line_cur_y;
 
 void line_move_to(uint16_t x, uint16_t y) {
   line_cur_x = x;
   line_cur_y = y;
-  // line_cur_fb_x = (uint8_t*)fb_next + (x >> 8) * 30;
 }
 
 template <typename T> T rotl(T t, uint8_t amt) {
