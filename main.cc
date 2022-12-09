@@ -30,6 +30,7 @@ constexpr uint16_t scale_speed = 10;
 
 uint16_t player_x = 150;
 uint16_t player_y = 150;
+uint16_t player_z = 50;
 uint16_t player_ang = 0;
 
 constexpr uint16_t speed = 5;
@@ -156,7 +157,7 @@ void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
 bool on_screen(int16_t vc_x, int16_t vc_y);
 bool line_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2, int16_t vc_y2);
 void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y);
-void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
+void overhead_to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
 
 int16_t overhead_cur_vc_x;
 int16_t overhead_cur_vc_y;
@@ -167,7 +168,7 @@ void overhead_wall_move_to(uint16_t x, uint16_t y) {
   to_vc(x, y, &overhead_cur_vc_x, &overhead_cur_vc_y);
   if (on_screen(overhead_cur_vc_x, overhead_cur_vc_y)) {
     uint16_t sx, sy;
-    to_screen(overhead_cur_vc_x, overhead_cur_vc_y, &sx, &sy);
+    overhead_to_screen(overhead_cur_vc_x, overhead_cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
 }
@@ -188,7 +189,7 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   if (!on_screen(overhead_cur_vc_x, overhead_cur_vc_y)) {
     clip(vc_x, vc_y, &overhead_cur_vc_x, &overhead_cur_vc_y);
     uint16_t sx, sy;
-    to_screen(overhead_cur_vc_x, overhead_cur_vc_y, &sx, &sy);
+    overhead_to_screen(overhead_cur_vc_x, overhead_cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
   if (!on_screen(vc_x, vc_y))
@@ -198,7 +199,7 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   overhead_cur_vc_y = unclipped_vc_y;
 
   uint16_t sx, sy;
-  to_screen(vc_x, vc_y, &sx, &sy);
+  overhead_to_screen(vc_x, vc_y, &sx, &sy);
   line_draw_to(3, sx, sy);
 }
 
@@ -206,10 +207,22 @@ int16_t perspective_cur_vc_x;
 int16_t perspective_cur_vc_y;
 
 bool in_frustum(int16_t vc_x, int16_t vc_y);
+void perspective_to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
+                           int16_t vc_z_bot, uint8_t *sx, uint8_t *sy_top,
+                           uint8_t *sy_bot);
+
+constexpr int16_t wall_top_z = 100;
+constexpr int16_t wall_bot_z = 0;
 
 void perspective_wall_move_to(uint16_t x, uint16_t y) {
   to_vc(x, y, &perspective_cur_vc_x, &perspective_cur_vc_y);
   if (in_frustum(perspective_cur_vc_x, perspective_cur_vc_y)) {
+    int16_t vc_z_top = wall_top_z - player_z;
+    int16_t vc_z_bot = wall_bot_z - player_z;
+
+    uint8_t sx, sy_top, sy_bot;
+    perspective_to_screen(perspective_cur_vc_x, perspective_cur_vc_y, vc_z_top,
+                          vc_z_bot, &sx, &sy_top, &sy_bot);
 #if 0
     uint16_t sx, sy;
     to_screen(perspective_cur_vc_x, perspective_cur_vc_y, &sx, &sy);
@@ -220,7 +233,15 @@ void perspective_wall_move_to(uint16_t x, uint16_t y) {
 
 void perspective_wall_draw_to(uint16_t x, uint16_t y) {}
 
-bool in_frustum(int16_t vc_x, int16_t vc_y) { return false; }
+void perspective_to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
+                           int16_t vc_z_bot, uint8_t *sx, uint8_t *sy_top,
+                           uint8_t *sy_bot) {}
+
+bool in_frustum(int16_t vc_x, int16_t vc_y) {
+  if (vc_x <= 0)
+    return false;
+  return abs(vc_y) <= vc_x;
+}
 
 void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
   int16_t tx = x - player_x;
@@ -279,7 +300,8 @@ void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y) {
 
 constexpr uint16_t screen_guard = 5 * 256;
 
-void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy) {
+void overhead_to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx,
+                        uint16_t *sy) {
   *sx = ((int32_t)vc_x * 256 * width / 2 * wc_width_recip >> 16) +
         width / 2 * 256 + screen_guard;
   *sy = height / 2 * 256 -
