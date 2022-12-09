@@ -36,8 +36,10 @@ constexpr uint16_t speed = 5;
 constexpr uint16_t ang_speed = 1024;
 
 bool still_presenting;
+bool overhead_view;
 
-void render();
+void render_overhead();
+void render_perspective();
 void init_present();
 void present();
 
@@ -58,7 +60,9 @@ int main() {
   while (true) {
     uint8_t pad_t = pad_trigger(0);
     uint8_t pad = pad_state(0);
-    if (pad & PAD_B) {
+    if (pad_t & PAD_START)
+      overhead_view = !overhead_view;
+    if (overhead_view && pad & PAD_B) {
       if (pad & PAD_UP) {
         wc_width = (uint32_t)wc_width * (100 - scale_speed) / 100;
         wc_width_recip = (uint32_t)65536 / wc_width;
@@ -92,8 +96,12 @@ int main() {
       }
     }
 
-    if (!still_presenting)
-      render();
+    if (!still_presenting) {
+      if (overhead_view)
+        render_overhead();
+      else
+        render_perspective();
+    }
     present();
   }
 }
@@ -107,6 +115,9 @@ void wall_draw_to(uint8_t color, uint8_t x, uint8_t y_top, uint8_t y_bot);
 
 void overhead_wall_move_to(uint16_t x, uint16_t y);
 void overhead_wall_draw_to(uint16_t x, uint16_t y);
+
+void perspective_wall_move_to(uint16_t x, uint16_t y);
+void perspective_wall_draw_to(uint16_t x, uint16_t y);
 
 #pragma clang section bss = ".prg_ram_0"
 uint8_t fb_cur[960];
@@ -123,7 +134,7 @@ __attribute__((no_builtin("memset"))) void clear_screen() {
     (fb_next + 768)[i] = 0;
 }
 
-void render() {
+void render_overhead() {
   clear_screen();
   overhead_wall_move_to(100, 100);
   overhead_wall_draw_to(100, 200);
@@ -132,22 +143,31 @@ void render() {
   overhead_wall_draw_to(100, 100);
 }
 
+void render_perspective() {
+  clear_screen();
+  perspective_wall_move_to(100, 100);
+  perspective_wall_draw_to(100, 200);
+  perspective_wall_draw_to(200, 200);
+  perspective_wall_draw_to(200, 100);
+  perspective_wall_draw_to(100, 100);
+}
+
 void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
 bool on_screen(int16_t vc_x, int16_t vc_y);
 bool line_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2, int16_t vc_y2);
 void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y);
 void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
 
-int16_t cur_vc_x;
-int16_t cur_vc_y;
+int16_t overhead_cur_vc_x;
+int16_t overhead_cur_vc_y;
 
 template <typename T> T abs(T t) { return t < 0 ? -t : t; }
 
 void overhead_wall_move_to(uint16_t x, uint16_t y) {
-  to_vc(x, y, &cur_vc_x, &cur_vc_y);
-  if (on_screen(cur_vc_x, cur_vc_y)) {
+  to_vc(x, y, &overhead_cur_vc_x, &overhead_cur_vc_y);
+  if (on_screen(overhead_cur_vc_x, overhead_cur_vc_y)) {
     uint16_t sx, sy;
-    to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
+    to_screen(overhead_cur_vc_x, overhead_cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
 }
@@ -156,31 +176,51 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   int16_t vc_x, vc_y;
   to_vc(x, y, &vc_x, &vc_y);
 
-  if (!line_on_screen(vc_x, vc_y, cur_vc_x, cur_vc_y)) {
-    cur_vc_x = vc_x;
-    cur_vc_y = vc_y;
+  if (!line_on_screen(vc_x, vc_y, overhead_cur_vc_x, overhead_cur_vc_y)) {
+    overhead_cur_vc_x = vc_x;
+    overhead_cur_vc_y = vc_y;
     return;
   }
 
   int16_t unclipped_vc_x = vc_x;
   int16_t unclipped_vc_y = vc_y;
 
-  if (!on_screen(cur_vc_x, cur_vc_y)) {
-    clip(vc_x, vc_y, &cur_vc_x, &cur_vc_y);
+  if (!on_screen(overhead_cur_vc_x, overhead_cur_vc_y)) {
+    clip(vc_x, vc_y, &overhead_cur_vc_x, &overhead_cur_vc_y);
     uint16_t sx, sy;
-    to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
+    to_screen(overhead_cur_vc_x, overhead_cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
   if (!on_screen(vc_x, vc_y))
-    clip(cur_vc_x, cur_vc_y, &vc_x, &vc_y);
+    clip(overhead_cur_vc_x, overhead_cur_vc_y, &vc_x, &vc_y);
 
-  cur_vc_x = unclipped_vc_x;
-  cur_vc_y = unclipped_vc_y;
+  overhead_cur_vc_x = unclipped_vc_x;
+  overhead_cur_vc_y = unclipped_vc_y;
 
   uint16_t sx, sy;
   to_screen(vc_x, vc_y, &sx, &sy);
   line_draw_to(3, sx, sy);
 }
+
+int16_t perspective_cur_vc_x;
+int16_t perspective_cur_vc_y;
+
+bool in_frustum(int16_t vc_x, int16_t vc_y);
+
+void perspective_wall_move_to(uint16_t x, uint16_t y) {
+  to_vc(x, y, &perspective_cur_vc_x, &perspective_cur_vc_y);
+  if (in_frustum(perspective_cur_vc_x, perspective_cur_vc_y)) {
+#if 0
+    uint16_t sx, sy;
+    to_screen(perspective_cur_vc_x, perspective_cur_vc_y, &sx, &sy);
+    line_move_to(sx, sy);
+#endif
+  }
+}
+
+void perspective_wall_draw_to(uint16_t x, uint16_t y) {}
+
+bool in_frustum(int16_t vc_x, int16_t vc_y) { return false; }
 
 void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
   int16_t tx = x - player_x;
