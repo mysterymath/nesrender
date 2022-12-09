@@ -242,6 +242,22 @@ void to_screen(int16_t vc_x, int16_t vc_y, int16_t *sx, int16_t *sy) {
         width / 2 * 256;
   *sy = height / 2 * 256 -
         ((int32_t)vc_y * 256 * width / 2 * wc_width_recip >> 16);
+  if (*sx < 0) {
+    printf("sx: %d\n", *sx);
+    BRK();
+  }
+  if (*sy < 0) {
+    printf("sy: %d\n", *sy);
+    BRK();
+  }
+  if (*sx >= width * 256) {
+    printf("sx: %d\n", *sx);
+    BRK();
+  }
+  if (*sy >= height * 256) {
+    printf("sy: %d\n", *sy);
+    BRK();
+  }
 }
 
 extern "C" void __putchar(char c) { POKE(0x4018, c); }
