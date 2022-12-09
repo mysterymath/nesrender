@@ -136,7 +136,7 @@ void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
 bool on_screen(int16_t vc_x, int16_t vc_y);
 bool line_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2, int16_t vc_y2);
 void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y);
-void to_screen(int16_t vc_x, int16_t vc_y, int16_t *sx, int16_t *sy);
+void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
 
 int16_t cur_vc_x;
 int16_t cur_vc_y;
@@ -146,7 +146,7 @@ template <typename T> T abs(T t) { return t < 0 ? -t : t; }
 void overhead_wall_move_to(uint16_t x, uint16_t y) {
   to_vc(x, y, &cur_vc_x, &cur_vc_y);
   if (on_screen(cur_vc_x, cur_vc_y)) {
-    int16_t sx, sy;
+    uint16_t sx, sy;
     to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
@@ -167,7 +167,7 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y) {
 
   if (!on_screen(cur_vc_x, cur_vc_y)) {
     clip(vc_x, vc_y, &cur_vc_x, &cur_vc_y);
-    int16_t sx, sy;
+    uint16_t sx, sy;
     to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
@@ -177,7 +177,7 @@ void overhead_wall_draw_to(uint16_t x, uint16_t y) {
   cur_vc_x = unclipped_vc_x;
   cur_vc_y = unclipped_vc_y;
 
-  int16_t sx, sy;
+  uint16_t sx, sy;
   to_screen(vc_x, vc_y, &sx, &sy);
   line_draw_to(3, sx, sy);
 }
@@ -237,27 +237,13 @@ void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x, int16_t *clip_vc_y) {
   }
 }
 
-void to_screen(int16_t vc_x, int16_t vc_y, int16_t *sx, int16_t *sy) {
+constexpr uint16_t screen_guard = 5 * 256;
+
+void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy) {
   *sx = ((int32_t)vc_x * 256 * width / 2 * wc_width_recip >> 16) +
-        width / 2 * 256;
+        width / 2 * 256 + screen_guard;
   *sy = height / 2 * 256 -
-        ((int32_t)vc_y * 256 * width / 2 * wc_width_recip >> 16);
-  if (*sx < 0) {
-    printf("sx: %d\n", *sx);
-    BRK();
-  }
-  if (*sy < 0) {
-    printf("sy: %d\n", *sy);
-    BRK();
-  }
-  if (*sx >= width * 256) {
-    printf("sx: %d\n", *sx);
-    BRK();
-  }
-  if (*sy >= height * 256) {
-    printf("sy: %d\n", *sy);
-    BRK();
-  }
+        ((int32_t)vc_y * 256 * width / 2 * wc_width_recip >> 16) + screen_guard;
 }
 
 extern "C" void __putchar(char c) { POKE(0x4018, c); }
@@ -295,16 +281,39 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
       dy = -1 * 256;
   }
 
+  // Move onto the screen.
   uint16_t x = line_cur_x;
   uint16_t y = line_cur_y;
+  while (x < screen_guard || y < screen_guard ||
+         x >= width * 256 + screen_guard || y >= height * 256 + screen_guard) {
+    if (x_major ? x / 256 == to_x / 256 : y / 256 == to_y / 256) {
+      line_cur_x = to_x;
+      line_cur_y = to_y;
+      return;
+    }
+    x += dx;
+    y += dy;
+  }
+
+  // Switch to unguarded screen coordinates.
+  x -= screen_guard;
+  to_x -= screen_guard;
+  y -= screen_guard;
+  to_y -= screen_guard;
+
   uint16_t offset = x / 256 / 2 * 30 + y / 256 / 2;
   while (x_major ? x / 256 != to_x / 256 : y / 256 != to_y / 256) {
     uint8_t shift = (x / 256 % 2 * 2 + y / 256 % 2) * 2;
     and_mask = rotl((uint8_t)0b11111100, shift);
     uint8_t or_mask = color << shift;
-    // TODO: Don't multiply for each drawn pixel!
     fb_next[offset] &= and_mask;
     fb_next[offset] |= or_mask;
+
+    if (dx < 0 ? x < -dx : x + dx >= width * 256)
+      break;
+    if (dy < 0 ? y < -dy : y + dy >= height * 256)
+      break;
+
     if ((x + dx) / 256 / 2 > x / 256 / 2)
       offset += 30;
     else if ((x + dx) / 256 / 2 < x / 256 / 2)
@@ -316,8 +325,8 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
     x += dx;
     y += dy;
   }
-  line_cur_x = to_x;
-  line_cur_y = to_y;
+  line_cur_x = to_x + screen_guard;
+  line_cur_y = to_y + screen_guard;
 }
 
 uint8_t cur_x;
