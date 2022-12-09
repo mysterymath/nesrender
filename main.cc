@@ -66,11 +66,11 @@ int main() {
     if (pad & PAD_B) {
       if (pad & PAD_UP) {
         wc_width = (uint32_t)wc_width * (100 - scale_speed) / 100;
-        wc_width_recip = (uint32_t)wc_width_recip * (100 + scale_speed) / 100;
+        wc_width_recip = (uint32_t)65536 / wc_width;
         wc_height = wc_width * height / width;
       } else if (pad & PAD_DOWN) {
         wc_width = (uint32_t)wc_width * (100 + scale_speed) / 100;
-        wc_width_recip = (uint32_t)wc_width_recip * (100 - scale_speed) / 100;
+        wc_width_recip = (uint32_t)65536 / wc_width;
         wc_height = wc_width * height / width;
       }
     } else {
