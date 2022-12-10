@@ -10,7 +10,7 @@
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
-void perspective_render() {
+void perspective::render() {
   clear_screen();
   move_to(100, 100);
   draw_to(100, 200);
@@ -32,10 +32,10 @@ constexpr int16_t wall_top_z = 100;
 constexpr int16_t wall_bot_z = 0;
 
 static void move_to(uint16_t x, uint16_t y) {
-  to_vc(x, y, &cur_vc_x, &cur_vc_y);
+  player.to_vc(x, y, &cur_vc_x, &cur_vc_y);
   int16_t vc_z_top, vc_z_bot;
-  to_vc_z(wall_top_z, &vc_z_top);
-  to_vc_z(wall_bot_z, &vc_z_bot);
+  player.to_vc_z(wall_top_z, &vc_z_top);
+  player.to_vc_z(wall_bot_z, &vc_z_bot);
   if (in_frustum(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot)) {
 
     uint8_t sx, sy_top, sy_bot;

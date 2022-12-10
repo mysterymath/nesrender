@@ -43,32 +43,32 @@ int main() {
       overhead_view = !overhead_view;
     if (overhead_view && pad & PAD_B) {
       if (pad & PAD_UP)
-        overhead_scale_up();
+        overhead::scale_up();
       else if (pad & PAD_DOWN)
-        overhead_scale_down();
+        overhead::scale_down();
     } else {
       if (pad & PAD_UP)
-        player_forward();
+        player.forward();
       else if (pad & PAD_DOWN)
-        player_backward();
+        player.backward();
       if (pad & PAD_A) {
         if (pad & PAD_LEFT)
-          player_strafe_left();
+          player.strafe_left();
         else if (pad & PAD_RIGHT)
-          player_strafe_right();
+          player.strafe_right();
       } else {
         if (pad & PAD_LEFT)
-          player_turn_left();
+          player.turn_left();
         else if (pad & PAD_RIGHT)
-          player_turn_right();
+          player.turn_right();
       }
     }
 
     if (!still_presenting) {
       if (overhead_view)
-        overhead_render();
+        overhead::render();
       else
-        perspective_render();
+        perspective::render();
     }
     present();
   }

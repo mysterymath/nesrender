@@ -10,5 +10,6 @@ for i in range(256):
   lo[i] = s & 0xff
   hi[i] = s >> 8
 
-print('const char sin_table_lo[] = {', ','.join(map(str, lo)), '};')
-print('const char sin_table_hi[] = {', ','.join(map(str, hi)), '};')
+print('#include <stdint.h>')
+print('const uint8_t sin_table_lo[] = {', ','.join(map(str, lo)), '};')
+print('const uint8_t sin_table_hi[] = {', ','.join(map(str, hi)), '};')

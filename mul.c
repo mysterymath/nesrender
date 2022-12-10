@@ -2,12 +2,12 @@
 
 #include <stdbool.h>
 
-extern const char qs_0_255_lo[];
-extern const char qs_0_255_hi[];
-extern const char qs_256_511_lo[];
-extern const char qs_256_511_hi[];
+extern const uint8_t qs_0_255_lo[];
+extern const uint8_t qs_0_255_hi[];
+extern const uint8_t qs_256_511_lo[];
+extern const uint8_t qs_256_511_hi[];
 
-// (char)floor(n^2/4)
+// (uint8_t)floor(n^2/4)
 static uint16_t qs_8(uint8_t n, bool hi) {
   return hi ? qs_256_511_lo[n] : qs_0_255_lo[n];
 }

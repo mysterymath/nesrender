@@ -1,6 +1,10 @@
 #ifndef PERSPECTIVE_H
 #define PERSPECTIVE_H
 
-void perspective_render();
+namespace perspective {
+
+void render();
+
+} // namespace perspective
 
 #endif // not PERSPECTIVE_H

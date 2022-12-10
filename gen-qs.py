@@ -8,7 +8,8 @@ for i in range(512):
   lo[i] = qs & 0xff
   hi[i] = qs >> 8
 
-print('const char qs_0_255_lo[] = {', ','.join(map(str, lo[:256])), '};')
-print('const char qs_0_255_hi[] = {', ','.join(map(str, hi[:256])), '};')
-print('const char qs_256_511_lo[] = {', ','.join(map(str, lo[256:])), '};')
-print('const char qs_256_511_hi[] = {', ','.join(map(str, hi[256:])), '};')
+print('#include <stdint.h>')
+print('const uint8_t qs_0_255_lo[] = {', ','.join(map(str, lo[:256])), '};')
+print('const uint8_t qs_0_255_hi[] = {', ','.join(map(str, hi[:256])), '};')
+print('const uint8_t qs_256_511_lo[] = {', ','.join(map(str, lo[256:])), '};')
+print('const uint8_t qs_256_511_hi[] = {', ','.join(map(str, hi[256:])), '};')
