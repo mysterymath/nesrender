@@ -33,13 +33,17 @@ static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
 
 static int16_t cur_vc_x;
 static int16_t cur_vc_y;
+static bool cur_on_screen;
 
 static void move_to(uint16_t x, uint16_t y) {
   player.to_vc(x, y, &cur_vc_x, &cur_vc_y);
   if (on_screen(cur_vc_x, cur_vc_y)) {
+    cur_on_screen = true;
     uint16_t sx, sy;
     to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
+  } else {
+    cur_on_screen = false;
   }
 }
 
@@ -47,7 +51,8 @@ static void draw_to(uint16_t x, uint16_t y) {
   int16_t vc_x, vc_y;
   player.to_vc(x, y, &vc_x, &vc_y);
 
-  if (!line_visible(vc_x, vc_y, cur_vc_x, cur_vc_y)) {
+  // If the current is on screen, the line is definitely visible.
+  if (!cur_on_screen && !line_visible(vc_x, vc_y, cur_vc_x, cur_vc_y)) {
     cur_vc_x = vc_x;
     cur_vc_y = vc_y;
     return;
@@ -56,14 +61,18 @@ static void draw_to(uint16_t x, uint16_t y) {
   int16_t unclipped_vc_x = vc_x;
   int16_t unclipped_vc_y = vc_y;
 
-  if (!on_screen(cur_vc_x, cur_vc_y)) {
+  if (!cur_on_screen) {
     clip(vc_x, vc_y, &cur_vc_x, &cur_vc_y);
     uint16_t sx, sy;
     to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
-  if (!on_screen(vc_x, vc_y))
+  if (!on_screen(vc_x, vc_y)) {
+    cur_on_screen = false;
     clip(cur_vc_x, cur_vc_y, &vc_x, &vc_y);
+  } else {
+    cur_on_screen = true;
+  }
 
   cur_vc_x = unclipped_vc_x;
   cur_vc_y = unclipped_vc_y;
