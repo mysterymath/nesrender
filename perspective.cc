@@ -25,8 +25,8 @@ static int16_t cur_vc_y;
 static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                        int16_t vc_z_bot);
 static void to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
-                      int16_t vc_z_bot, uint8_t *sx, uint8_t *sy_top,
-                      uint8_t *sy_bot);
+                      int16_t vc_z_bot, uint16_t *sx, uint16_t *sy_top,
+                      uint16_t *sy_bot);
 
 constexpr int16_t wall_top_z = 100;
 constexpr int16_t wall_bot_z = 0;
@@ -37,7 +37,7 @@ static void move_to(uint16_t x, uint16_t y) {
   player.to_vc_z(wall_top_z, &vc_z_top);
   player.to_vc_z(wall_bot_z, &vc_z_bot);
   if (in_frustum(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot)) {
-    uint8_t sx, sy_top, sy_bot;
+    uint16_t sx, sy_top, sy_bot;
     to_screen(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
     wall_move_to(sx, sy_top, sy_bot);
   }
@@ -46,8 +46,8 @@ static void move_to(uint16_t x, uint16_t y) {
 static void draw_to(uint16_t x, uint16_t y) {}
 
 static void to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
-                      int16_t vc_z_bot, uint8_t *sx, uint8_t *sy_top,
-                      uint8_t *sy_bot) {}
+                      int16_t vc_z_bot, uint16_t *sx, uint16_t *sy_top,
+                      uint16_t *sy_bot) {}
 
 static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                        int16_t vc_z_bot) {
@@ -63,5 +63,7 @@ static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
   // is proportional to x, so the frustum top and bottom must be z =
   // +-(h/2)x/(w/2) = +- hx/w. So, z is in frustum iff abs(z) <= hx/w, that is,
   // abs(z)*w <= hx.
-  return abs(vc_z_top) * screen_width <= vc_x * screen_height;
+  if (abs(vc_z_top) * screen_width > vc_x * screen_height)
+    return false;
+  return abs(vc_z_bot) * screen_width <= vc_x * screen_height;
 }
