@@ -1,4 +1,4 @@
-#include "wall.h"
+#include "draw.h"
 
 #include "screen.h"
 
@@ -15,7 +15,7 @@ void wall_move_to(uint16_t x, uint16_t y_top, uint16_t y_bot) {
 template <bool x_odd>
 void draw_column(uint8_t color, uint8_t *col, uint16_t y_top, uint16_t y_bot);
 
-void wall_draw_to(uint16_t color, uint16_t to_x, uint16_t to_y_top,
+void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
                   uint16_t to_y_bot) {
   int16_t dx = to_x - cur_x;
   if (!dx)
