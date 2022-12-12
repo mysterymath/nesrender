@@ -128,6 +128,8 @@ static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
       cur_vc_x += (int32_t)dx * t_num / t_denom;
       cur_vc_y += (int32_t)dy * t_num / t_denom;
       DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+    } else if (cur_vc_y < -cur_vc_x && vc_y >= -vc_x) {
+      DEBUG("Wall crosses right frustum edge from right to left. Backface culling.\n");
     }
   }
   bool cur_in_frustum =
