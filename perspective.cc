@@ -9,7 +9,9 @@
 #include "trig.h"
 #include "util.h"
 
-// #define DEBUG_FILE
+#pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
+
+//#define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -108,12 +110,33 @@ static void draw_to(uint16_t x, uint16_t y) {
 
 static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                          int16_t vc_z_bot) {
+  int16_t dx = vc_x - cur_vc_x;
+  int16_t dy = vc_y - cur_vc_y;
   if (!in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot)) {
-    // TODO
+    if (cur_vc_y > cur_vc_x && vc_y <= vc_x) {
+      DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
+      DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+      // w(t) = cur + (dw)t
+      // w(t)_x = w(t)_y
+      // cur_x + dx*t = cur_y + dy*t;
+      // t*(dx - dy) = cur_y - cur_x
+      // t = (cur_y - cur_x) / (dx - dy)
+      // Since the wall cannot be parallel to the left frustum edge, dx - dy !=
+      // 0.
+      int16_t t_num = cur_vc_y - cur_vc_x;
+      int16_t t_denom = dx - dy;
+      cur_vc_x += (int32_t)dx * t_num / t_denom;
+      cur_vc_y += (int32_t)dy * t_num / t_denom;
+      DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+    }
   }
-  if (in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot)) {
+  bool cur_in_frustum =
+      in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot);
+  if (cur_in_frustum) {
+    DEBUG("Cur in frustum.\n");
     uint16_t sx, sy_top, sy_bot;
-    to_screen(cur_vc_x, cur_vc_y, cur_vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
+    to_screen(cur_vc_x, cur_vc_y, cur_vc_z_top, vc_z_bot, &sx, &sy_top,
+              &sy_bot);
     DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
     wall_move_to(sx, sy_top, sy_bot);
   }
@@ -121,10 +144,14 @@ static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
     // TODO
   }
   if (in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot)) {
+    DEBUG("Next in frustum.\n");
     uint16_t sx, sy_top, sy_bot;
     to_screen(vc_x, vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
     DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
-    wall_move_to(sx, sy_top, sy_bot);
+    if (cur_in_frustum)
+      wall_draw_to(1, sx, sy_top, sy_bot);
+    else
+      wall_move_to(sx, sy_top, sy_bot);
   }
 }
 
@@ -147,21 +174,23 @@ static void to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
   // But, this maps all points along the left/right frustum to [+-1, +-1].
   // Accordingly, we need to scale by width/2, then add width/2 or height/2.
 
-  *sx =
-      (int32_t)-vc_y * (screen_width / 2) * 256 / vc_x + screen_width / 2 * 256;
+  *sx = (int32_t)-vc_y * (screen_width / 2) * 256 / vc_x +
+        screen_width / 2 * 256 + screen_guard;
   *sy_top = (int32_t)-vc_z_top * (screen_width / 2) * 256 / vc_x +
-            screen_height / 2 * 256;
+            screen_height / 2 * 256 + screen_guard;
   *sy_bot = (int32_t)-vc_z_bot * (screen_width / 2) * 256 / vc_x +
-            screen_height / 2 * 256;
+            screen_height / 2 * 256 + screen_guard;
 }
+
+static constexpr int16_t frustum_guard = 1;
 
 static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                        int16_t vc_z_bot) {
-  if (vc_x <= 0)
+  if (vc_x <= -frustum_guard)
     return false;
   // Using a FOV of 90 degrees, the frustum left and right are defined by y =
   // +-x.
-  if (abs(vc_y) > vc_x)
+  if (abs(vc_y) > vc_x + frustum_guard)
     return false;
 
   // Since the frustum left and right are y = +-x, take y = x = w/2. This should
@@ -169,9 +198,12 @@ static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
   // is proportional to x, so the frustum top and bottom must be z =
   // +-(h/2)x/(w/2) = +- hx/w. So, z is in frustum iff abs(z) <= hx/w, that is,
   // abs(z)*w <= hx.
-  if (abs(vc_z_top) * screen_width > vc_x * screen_height)
+
+  if (vc_z_bot * (int16_t)screen_width >
+      (vc_x + frustum_guard) * (int16_t)screen_height)
     return false;
-  return abs(vc_z_bot) * screen_width <= vc_x * screen_height;
+  return vc_z_top * (int16_t)screen_width >=
+         (-vc_x - frustum_guard) * (int16_t)screen_height;
 }
 
 static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,

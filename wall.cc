@@ -5,7 +5,7 @@
 #include "screen.h"
 #include "util.h"
 
-//#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static uint16_t cur_x;
@@ -40,6 +40,21 @@ void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
   uint16_t x = cur_x;
   uint16_t y_top = cur_y_top;
   uint16_t y_bot = cur_y_bot;
+
+  while (x / 256 != to_x / 256 &&
+         (x < screen_guard || x >= screen_width * 256 + screen_guard)) {
+    y_top += m_top;
+    y_bot += m_bot;
+    x += dx;
+  }
+
+  x -= screen_guard;
+  y_top -= screen_guard;
+  y_bot -= screen_guard;
+  to_x -= screen_guard;
+  to_y_top -= screen_guard;
+  to_y_bot -= screen_guard;
+
   uint8_t *fb_col = &fb_next[x / 256 / 2 * 30];
   while (x / 256 != to_x / 256) {
     uint8_t x_pix = x / 256;
@@ -57,9 +72,9 @@ void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
     y_bot += m_bot;
     x += dx;
   }
-  cur_x = x;
-  cur_y_top = y_top;
-  cur_y_bot = y_bot;
+  cur_x = x + screen_guard;
+  cur_y_top = y_top + screen_guard;
+  cur_y_bot = y_bot + screen_guard;
 }
 
 template <bool x_odd>
