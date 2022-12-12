@@ -1,6 +1,9 @@
 #include "draw.h"
 
+#include <stdio.h>
+
 #include "screen.h"
+#include "util.h"
 
 static uint16_t cur_x;
 static uint16_t cur_y_top;
@@ -13,18 +16,20 @@ void wall_move_to(uint16_t x, uint16_t y_top, uint16_t y_bot) {
 }
 
 template <bool x_odd>
-void draw_column(uint8_t color, uint8_t *col, uint16_t y_top, uint16_t y_bot);
+void draw_column(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot);
 
 void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
                   uint16_t to_y_bot) {
+  printf("Draw wall from (%u,%u-%u) to (%u,%u-%u)\n", cur_x, cur_y_top,
+         cur_y_bot, to_x, to_y_top, to_y_bot);
   int16_t dx = to_x - cur_x;
   if (!dx)
     return;
   int16_t dy_top = to_y_top - cur_y_top;
   int16_t dy_bot = to_y_bot - cur_y_bot;
   // Values in 8.8 fixed point
-  int16_t m_top = (int32_t)dy_top * 256 / dx;
-  int16_t m_bot = (int32_t)dy_bot * 256 / dx;
+  int16_t m_top = (int32_t)dy_top * 256 / abs(dx);
+  int16_t m_bot = (int32_t)dy_bot * 256 / abs(dx);
   dx = dx < 0 ? -256 : 256;
 
   uint16_t x = cur_x;
@@ -53,7 +58,7 @@ void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
 }
 
 template <bool x_odd>
-void draw_column(uint8_t color, uint8_t *col, uint16_t y_top, uint16_t y_bot) {
+void draw_column(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot) {
   if (y_top >= y_bot)
     return;
   uint8_t i = y_top / 2;
