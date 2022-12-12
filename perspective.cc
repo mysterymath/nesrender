@@ -9,7 +9,7 @@
 #include "trig.h"
 #include "util.h"
 
-// #define DEBUG_FILE
+#define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -26,10 +26,15 @@ void perspective::render() {
 
 static int16_t cur_vc_x;
 static int16_t cur_vc_y;
+static int16_t cur_vc_z_top;
+static int16_t cur_vc_z_bot;
 static bool cur_on_screen;
 
 static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                        int16_t vc_z_bot);
+static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,
+                           int16_t vc_z_bot1, int16_t vc_x2, int16_t vc_y2,
+                           int16_t vc_z_top2, int16_t vc_z_bot2);
 static void to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                       int16_t vc_z_bot, uint16_t *sx, uint16_t *sy_top,
                       uint16_t *sy_bot);
@@ -42,15 +47,15 @@ constexpr int16_t wall_bot_z = 40;
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: %u, %u\n", x, y);
   to_vc(x, y, &cur_vc_x, &cur_vc_y);
-  int16_t vc_z_top, vc_z_bot;
-  to_vc_z(wall_top_z, &vc_z_top);
-  to_vc_z(wall_bot_z, &vc_z_bot);
-  DEBUG("vc_x: %d, y: %d, z_top: %d, z_bot: %d\n", cur_vc_x, cur_vc_y, vc_z_top,
-        vc_z_bot);
-  if (in_frustum(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot)) {
+  to_vc_z(wall_top_z, &cur_vc_z_top);
+  to_vc_z(wall_bot_z, &cur_vc_z_bot);
+  DEBUG("vc_x: %d, y: %d, z_top: %d, z_bot: %d\n", cur_vc_x, cur_vc_y,
+        cur_vc_z_top, cur_vc_z_bot);
+  if (in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot)) {
     DEBUG("in frustum.\n");
     uint16_t sx, sy_top, sy_bot;
-    to_screen(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
+    to_screen(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot, &sx, &sy_top,
+              &sy_bot);
     DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
     wall_move_to(sx, sy_top, sy_bot);
     cur_on_screen = true;
@@ -63,15 +68,30 @@ static void move_to(uint16_t x, uint16_t y) {
 static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: %u, %u\n", x, y);
 
-  to_vc(x, y, &cur_vc_x, &cur_vc_y);
+  int16_t vc_x, vc_y;
+  to_vc(x, y, &vc_x, &vc_y);
   int16_t vc_z_top, vc_z_bot;
   to_vc_z(wall_top_z, &vc_z_top);
   to_vc_z(wall_bot_z, &vc_z_bot);
-
-  DEBUG("vc_x: %d, y: %d, z_top: %d, z_bot: %d\n", cur_vc_x, cur_vc_y, vc_z_top,
+  DEBUG("vc_x: %d, y: %d, z_top: %d, z_bot: %d\n", vc_x, vc_y, vc_z_top,
         vc_z_bot);
 
-  bool on_screen = in_frustum(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot);
+  if (!wall_on_screen(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot, vc_x,
+                      vc_y, vc_z_top, vc_z_bot)) {
+    cur_vc_x = vc_x;
+    cur_vc_y = vc_y;
+    cur_vc_z_top = vc_z_top;
+    cur_vc_z_bot = vc_z_bot;
+    cur_on_screen = false;
+    DEBUG("Wall entirely outside frustum. Culled.\n");
+  }
+
+  cur_vc_x = vc_x;
+  cur_vc_y = vc_y;
+  cur_vc_z_top = vc_z_top;
+  cur_vc_z_bot = vc_z_bot;
+
+  bool on_screen = in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot);
   DEBUG("in frustum: %d\n", on_screen);
   if (!on_screen) {
     cur_on_screen = false;
@@ -79,7 +99,7 @@ static void draw_to(uint16_t x, uint16_t y) {
   }
 
   uint16_t sx, sy_top, sy_bot;
-  to_screen(cur_vc_x, cur_vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
+  to_screen(vc_x, vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
   DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
 
   if (!cur_on_screen)
@@ -133,4 +153,28 @@ static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
   if (abs(vc_z_top) * screen_width > vc_x * screen_height)
     return false;
   return abs(vc_z_bot) * screen_width <= vc_x * screen_height;
+}
+
+static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,
+                           int16_t vc_z_bot1, int16_t vc_x2, int16_t vc_y2,
+                           int16_t vc_z_top2, int16_t vc_z_bot2) {
+  if (vc_y1 > vc_x1 && vc_y2 > vc_x2) {
+    DEBUG("Both points to the left of left frustum edge.\n");
+    return false;
+  }
+  if (vc_y1 < -vc_x1 && vc_y2 < -vc_x2) {
+    DEBUG("Both points to the right of right frustum edge.\n");
+    return false;
+  }
+  if (vc_z_bot1 * (int16_t)screen_width > vc_x1 * (int16_t)screen_height &&
+      vc_z_bot2 * (int16_t)screen_width > vc_x2 * (int16_t)screen_height) {
+    DEBUG("Bottom of both walls above top frustum edge.\n");
+    return false;
+  }
+  if (vc_z_top1 * (int16_t)screen_width < -vc_x1 * (int16_t)screen_height &&
+      vc_z_top2 * (int16_t)screen_width < -vc_x2 * (int16_t)screen_height) {
+    DEBUG("Top of both walls below bottom frustum edge.\n");
+    return false;
+  }
+  return true;
 }
