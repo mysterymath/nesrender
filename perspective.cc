@@ -9,7 +9,7 @@
 #include "trig.h"
 #include "util.h"
 
-#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -35,6 +35,8 @@ static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
 static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,
                            int16_t vc_z_bot1, int16_t vc_x2, int16_t vc_y2,
                            int16_t vc_z_top2, int16_t vc_z_bot2);
+static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
+                         int16_t vc_z_bot);
 static void to_screen(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                       int16_t vc_z_bot, uint16_t *sx, uint16_t *sy_top,
                       uint16_t *sy_bot);
@@ -84,29 +86,46 @@ static void draw_to(uint16_t x, uint16_t y) {
     cur_vc_z_bot = vc_z_bot;
     cur_on_screen = false;
     DEBUG("Wall entirely outside frustum. Culled.\n");
+    return;
   }
 
+  bool on_screen = in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot);
+  DEBUG("in frustum: %d\n", on_screen);
+  if (cur_on_screen && on_screen) {
+    uint16_t sx, sy_top, sy_bot;
+    to_screen(vc_x, vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
+    DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
+    wall_draw_to(1, sx, sy_top, sy_bot);
+  } else {
+    draw_clipped(vc_x, vc_y, vc_z_top, vc_z_bot);
+  }
   cur_vc_x = vc_x;
   cur_vc_y = vc_y;
   cur_vc_z_top = vc_z_top;
   cur_vc_z_bot = vc_z_bot;
+  cur_on_screen = on_screen;
+}
 
-  bool on_screen = in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot);
-  DEBUG("in frustum: %d\n", on_screen);
-  if (!on_screen) {
-    cur_on_screen = false;
-    return;
+static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
+                         int16_t vc_z_bot) {
+  if (!in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot)) {
+    // TODO
   }
-
-  uint16_t sx, sy_top, sy_bot;
-  to_screen(vc_x, vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
-  DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
-
-  if (!cur_on_screen)
+  if (in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot)) {
+    uint16_t sx, sy_top, sy_bot;
+    to_screen(cur_vc_x, cur_vc_y, cur_vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
+    DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
     wall_move_to(sx, sy_top, sy_bot);
-  else
-    wall_draw_to(1, sx, sy_top, sy_bot);
-  cur_on_screen = true;
+  }
+  if (!in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot)) {
+    // TODO
+  }
+  if (in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot)) {
+    uint16_t sx, sy_top, sy_bot;
+    to_screen(vc_x, vc_y, vc_z_top, vc_z_bot, &sx, &sy_top, &sy_bot);
+    DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
+    wall_move_to(sx, sy_top, sy_bot);
+  }
 }
 
 static void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
