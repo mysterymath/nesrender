@@ -40,8 +40,13 @@ int main() {
     uint8_t pad_t = pad_trigger(0);
     uint8_t pad = pad_state(0);
 
-    if (pad_t & PAD_START)
+    if (pad_t & PAD_START) {
       overhead_view = !overhead_view;
+      if (overhead_view)
+        oam_spr(128 - 4, 120 - 4, 0, 0);
+      else
+        oam_clear();
+    }
     if (overhead_view && pad & PAD_B) {
       if (pad & PAD_UP)
         overhead::scale_up();
