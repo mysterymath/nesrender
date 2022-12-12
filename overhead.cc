@@ -5,9 +5,11 @@
 #include "screen.h"
 #include "util.h"
 
-uint16_t vc_width = 100;
-uint16_t vc_width_recip = (uint32_t)65536 / vc_width;
-uint16_t vc_height = vc_width * screen_height / screen_width;
+#pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
+
+static uint16_t vc_width = 100;
+static uint16_t vc_width_recip = (uint32_t)65536 / vc_width;
+static uint16_t vc_height = vc_width * screen_height / screen_width;
 
 // Percent
 constexpr uint16_t scale_speed = 10;

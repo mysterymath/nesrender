@@ -27,6 +27,7 @@ int main() {
   static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
+  set_prg_bank(0);
   pal_bright(4);
   pal_bg(bg_pal);
   pal_spr(spr_pal);
