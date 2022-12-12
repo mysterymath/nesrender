@@ -20,7 +20,7 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-bool overhead_view;
+bool overhead_view = true;
 
 int main() {
   static const uint8_t bg_pal[16] = {0x00, 0x11, 0x16, 0x1a};

@@ -3,6 +3,7 @@
 #include "draw.h"
 #include "map.h"
 #include "screen.h"
+#include "trig.h"
 #include "util.h"
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
@@ -26,6 +27,7 @@ void overhead::render() {
   draw_to(100, 100);
 }
 
+static void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
 static bool on_screen(int16_t vc_x, int16_t vc_y);
 static bool line_visible(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
                          int16_t vc_y2);
@@ -38,7 +40,7 @@ static int16_t cur_vc_y;
 static bool cur_on_screen;
 
 static void move_to(uint16_t x, uint16_t y) {
-  player.to_vc(x, y, &cur_vc_x, &cur_vc_y);
+  to_vc(x, y, &cur_vc_x, &cur_vc_y);
   if (on_screen(cur_vc_x, cur_vc_y)) {
     cur_on_screen = true;
     uint16_t sx, sy;
@@ -51,7 +53,7 @@ static void move_to(uint16_t x, uint16_t y) {
 
 static void draw_to(uint16_t x, uint16_t y) {
   int16_t vc_x, vc_y;
-  player.to_vc(x, y, &vc_x, &vc_y);
+  to_vc(x, y, &vc_x, &vc_y);
 
   // If the current is on screen, the line is definitely visible.
   if (!cur_on_screen && !line_visible(vc_x, vc_y, cur_vc_x, cur_vc_y)) {
@@ -82,6 +84,15 @@ static void draw_to(uint16_t x, uint16_t y) {
   uint16_t sx, sy;
   to_screen(vc_x, vc_y, &sx, &sy);
   line_draw_to(3, sx, sy);
+}
+
+void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
+  int16_t tx = x - player.x;
+  int16_t ty = y - player.y;
+  // The player is facing up in the overhead view.
+  uint16_t ang = PI_OVER_2 - player.ang;
+  *vc_x = mul_cos(ang, tx) - mul_sin(ang, ty);
+  *vc_y = mul_sin(ang, tx) + mul_cos(ang, ty);
 }
 
 static bool on_screen(int16_t vc_x, int16_t vc_y) {
