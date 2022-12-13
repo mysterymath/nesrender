@@ -12,8 +12,7 @@ volatile uint8_t vram_buf[1025];
 
 volatile bool updating_vram;
 
-__attribute__((constructor))
-static void init() {
+__attribute__((constructor)) static void init() {
   uint16_t vbi = 0;
   // RTS
   vram_buf[vbi++] = 0x60;
@@ -60,11 +59,11 @@ void present() {
 
   uint16_t vbi = 0;
   for (; x < 32; x++, next_col += 30, cur_col += 30, vram_col++) {
-    for (uint8_t y = 0; y < 30; y++) {
+    uint16_t vram = vram_col;
+    for (uint8_t y = 0; y < 30; y++, vram += 32) {
       if (next_col[y] == cur_col[y])
         continue;
 
-      uint16_t vram = vram_col + y * 32;
       if (vbi == sizeof(vram_buf) - 1) {
         still_presenting = true;
         goto done;
