@@ -34,6 +34,7 @@ static bool cur_on_screen;
 
 static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                        int16_t vc_z_bot);
+static bool z_in_frustum(int16_t vc_x, int16_t vc_z);
 static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,
                            int16_t vc_z_bot1, int16_t vc_x2, int16_t vc_y2,
                            int16_t vc_z_top2, int16_t vc_z_bot2);
@@ -112,26 +113,50 @@ static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
                          int16_t vc_z_bot) {
   int16_t dx = vc_x - cur_vc_x;
   int16_t dy = vc_y - cur_vc_y;
-  if (!in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot)) {
-    if (cur_vc_y > cur_vc_x && vc_y <= vc_x) {
-      DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
-      DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
-      // w(t) = cur + (dw)t
-      // w(t)_x = w(t)_y
-      // cur_x + dx*t = cur_y + dy*t;
-      // t*(dx - dy) = cur_y - cur_x
-      // t = (cur_y - cur_x) / (dx - dy)
-      // Since the wall cannot be parallel to the left frustum edge, dx - dy !=
-      // 0.
-      int16_t t_num = cur_vc_y - cur_vc_x;
-      int16_t t_denom = dx - dy;
-      cur_vc_x += (int32_t)dx * t_num / t_denom;
-      cur_vc_y += (int32_t)dy * t_num / t_denom;
-      DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
-    } else if (cur_vc_y < -cur_vc_x && vc_y >= -vc_x) {
-      DEBUG("Wall crosses right frustum edge from right to left. Backface "
-            "culling.\n");
-    }
+  if (cur_vc_y > cur_vc_x && vc_y <= vc_x) {
+    DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
+    DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+    // w(t) = cur + (dw)t
+    // w(t)_x = w(t)_y
+    // cur_x + dx*t = cur_y + dy*t;
+    // t*(dx - dy) = cur_y - cur_x
+    // t = (cur_y - cur_x) / (dx - dy)
+    // Since the wall cannot be parallel to the left frustum edge, dx - dy !=
+    // 0.
+    int16_t t_num = cur_vc_y - cur_vc_x;
+    int16_t t_denom = dx - dy;
+    cur_vc_x += (int32_t)dx * t_num / t_denom;
+    cur_vc_y += (int32_t)dy * t_num / t_denom;
+    DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+  } else if (cur_vc_y < -cur_vc_x && vc_y >= -vc_x) {
+    DEBUG("Wall crosses right frustum edge from right to left. Backface "
+          "culling.\n");
+  }
+  if (vc_y > vc_x && cur_vc_y <= cur_vc_x) {
+    DEBUG("Wall crosses left frustum edge from right to left. Backface "
+          "culling.\n");
+  } else if (vc_y < -vc_x && cur_vc_y >= -cur_vc_x) {
+    DEBUG("Wall crosses right frustum edge from left to right. Clipping.\n");
+    DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+    // w(t) = next + (dw)t
+    // w(t)_y = -w(t)_x
+    // next_y + dy*t = -next_x - dx*t;
+    // t*(dx + dy) = -next_y - next_x
+    // t = (-next_y - next_x) / (dx + dy)
+    // Since the wall cannot be parallel to the right frustum edge, dx + dy !=
+    // 0.
+    int16_t t_num = -vc_y - vc_x;
+    int16_t t_denom = dx + dy;
+    vc_x += (int32_t)dx * t_num / t_denom;
+    vc_y += (int32_t)dy * t_num / t_denom;
+    DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
+  }
+  if (cur_vc_z_top * (int32_t)screen_width >=
+          cur_vc_x * (int32_t)screen_height &&
+      vc_z_top * (int32_t)screen_width <
+          vc_x * (int32_t)screen_height) {
+    DEBUG("Wall crosses top frustum edge with left side higher from camera "
+          "POV. Clipping.\n");
   }
   bool cur_in_frustum =
       in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot);
@@ -142,27 +167,6 @@ static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
               &sy_bot);
     DEBUG("sx: %u, y_top: %u, y_bot: %u\n", sx, sy_top, sy_bot);
     wall_move_to(sx, sy_top, sy_bot);
-  }
-  if (!in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot)) {
-    if (vc_y > vc_x && cur_vc_y <= cur_vc_x) {
-      DEBUG("Wall crosses left frustum edge from right to left. Backface "
-            "culling.\n");
-    } else if (vc_y < -vc_x && cur_vc_y >= -cur_vc_x) {
-      DEBUG("Wall crosses right frustum edge from left to right. Clipping.\n");
-      DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
-      // w(t) = next + (dw)t
-      // w(t)_y = -w(t)_x
-      // next_y + dy*t = -next_x - dx*t;
-      // t*(dx + dy) = -next_y - next_x
-      // t = (-next_y - next_x) / (dx + dy)
-      // Since the wall cannot be parallel to the right frustum edge, dx + dy !=
-      // 0.
-      int16_t t_num = -vc_y - vc_x;
-      int16_t t_denom = dx + dy;
-      vc_x += (int32_t)dx * t_num / t_denom;
-      vc_y += (int32_t)dy * t_num / t_denom;
-      DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
-    }
   }
   if (in_frustum(vc_x, vc_y, vc_z_top, vc_z_bot)) {
     DEBUG("Next in frustum.\n");
@@ -214,17 +218,17 @@ static bool in_frustum(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
   if (abs(vc_y) > vc_x + frustum_guard)
     return false;
 
+  return z_in_frustum(vc_x, vc_z_top) && z_in_frustum(vc_x, vc_z_bot);
+}
+
+static bool z_in_frustum(int16_t vc_x, int16_t vc_z) {
   // Since the frustum left and right are y = +-x, take y = x = w/2. This should
   // lead to a world rectangle of width w and height h, so z must be h/2. But z
   // is proportional to x, so the frustum top and bottom must be z =
   // +-(h/2)x/(w/2) = +- hx/w. So, z is in frustum iff abs(z) <= hx/w, that is,
   // abs(z)*w <= hx.
-
-  if (vc_z_bot * (int16_t)screen_width >
-      (vc_x + frustum_guard) * (int16_t)screen_height)
-    return false;
-  return vc_z_top * (int16_t)screen_width >=
-         (-vc_x - frustum_guard) * (int16_t)screen_height;
+  return abs(vc_z) * (int32_t)screen_width <=
+         (vc_x + frustum_guard) * (int32_t)screen_height;
 }
 
 static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,
@@ -238,13 +242,13 @@ static bool wall_on_screen(int16_t vc_x1, int16_t vc_y1, int16_t vc_z_top1,
     DEBUG("Both points to the right of right frustum edge.\n");
     return false;
   }
-  if (vc_z_bot1 * (int16_t)screen_width > vc_x1 * (int16_t)screen_height &&
-      vc_z_bot2 * (int16_t)screen_width > vc_x2 * (int16_t)screen_height) {
+  if (vc_z_bot1 * (int32_t)screen_width > vc_x1 * (int32_t)screen_height &&
+      vc_z_bot2 * (int32_t)screen_width > vc_x2 * (int32_t)screen_height) {
     DEBUG("Bottom of both walls above top frustum edge.\n");
     return false;
   }
-  if (vc_z_top1 * (int16_t)screen_width < -vc_x1 * (int16_t)screen_height &&
-      vc_z_top2 * (int16_t)screen_width < -vc_x2 * (int16_t)screen_height) {
+  if (vc_z_top1 * (int32_t)screen_width < -vc_x1 * (int32_t)screen_height &&
+      vc_z_top2 * (int32_t)screen_width < -vc_x2 * (int32_t)screen_height) {
     DEBUG("Top of both walls below bottom frustum edge.\n");
     return false;
   }
