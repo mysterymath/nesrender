@@ -151,12 +151,20 @@ static void draw_clipped(int16_t vc_x, int16_t vc_y, int16_t vc_z_top,
     vc_y += (int32_t)dy * t_num / t_denom;
     DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_vc_x, cur_vc_y, vc_x, vc_y);
   }
-  if (cur_vc_z_top * (int32_t)screen_width >=
+  if (cur_vc_z_top * (int32_t)screen_width >
           cur_vc_x * (int32_t)screen_height &&
-      vc_z_top * (int32_t)screen_width <
-          vc_x * (int32_t)screen_height) {
-    DEBUG("Wall crosses top frustum edge with left side higher from camera "
-          "POV. Clipping.\n");
+      vc_z_top * (int32_t)screen_width > vc_x * (int32_t)screen_height) {
+    DEBUG("Wall left and right edge cross frustum top. Clipping.\n");
+    cur_vc_z_top = cur_vc_x * (int32_t)screen_height / screen_width;
+    vc_z_top = vc_x * (int32_t)screen_height / screen_width;
+  } else if (cur_vc_z_top * (int32_t)screen_width >
+                 cur_vc_x * (int32_t)screen_height &&
+             vc_z_top * (int32_t)screen_width < vc_x * (int32_t)screen_height) {
+    DEBUG("Wall top edge crosses frustum top from left to right. TODO: Clipping.\n");
+  } else if (cur_vc_z_top * (int32_t)screen_width <
+                 cur_vc_x * (int32_t)screen_height &&
+             vc_z_top * (int32_t)screen_width > vc_x * (int32_t)screen_height) {
+    DEBUG("Wall top edge crosses frustum top from right to left. TODO: Clipping.\n");
   }
   bool cur_in_frustum =
       in_frustum(cur_vc_x, cur_vc_y, cur_vc_z_top, cur_vc_z_bot);
