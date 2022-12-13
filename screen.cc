@@ -67,7 +67,6 @@ void present() {
       uint16_t vram = vram_col + y * 32;
       if (vbi == sizeof(vram_buf) - 1) {
         still_presenting = true;
-        ++y;
         goto done;
       }
       // Make any preexising RTS a NOP instead.
