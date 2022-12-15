@@ -48,8 +48,15 @@ constexpr int16_t wall_bot_z = 40;
 
 static void update_cur();
 
+#define DEBUG_CC(PREFIX, NAME)                                                 \
+  DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
+        NAME##_w)
+
+#define DEBUG_SCREEN(PREFIX)                                                   \
+  DEBUG("%s: (%u,[%u,%u])\n", PREFIX, sx, sy_top, sy_bot)
+
 static void move_to(uint16_t x, uint16_t y) {
-  DEBUG("Move to: %u, %u\n", x, y);
+  DEBUG("Move to: (%u,%u)\n", x, y);
   xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
   z_to_cc(wall_top_z, &cur_cc_y_top);
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
@@ -57,18 +64,19 @@ static void move_to(uint16_t x, uint16_t y) {
 }
 
 static void update_cur() {
-  DEBUG("Update cur: (%d,[%d,%d],%d)\n", cur_cc_x, cur_cc_y_top,
-        cur_cc_y_bot, cur_cc_w);
+  DEBUG_CC("Update cur", cur_cc);
+  DEBUG("\n");
   if (in_frustum(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w)) {
-    DEBUG("in frustum.\n");
+    DEBUG("In frustum.\n");
     uint16_t sx, sy_top, sy_bot;
     to_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, &sx, &sy_top,
               &sy_bot);
-    DEBUG("Screen: (%u,[%u,%u])\n", sx, sy_top, sy_bot);
+
+    DEBUG_SCREEN("Screen: ");
     wall_move_to(sx, sy_top, sy_bot);
     cur_on_screen = true;
   } else {
-    DEBUG("not in frustum.\n");
+    DEBUG("Not in frustum.\n");
     cur_on_screen = false;
   }
 }
@@ -77,14 +85,14 @@ static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
                        int16_t cc_w);
 
 static void draw_to(uint16_t x, uint16_t y) {
-  DEBUG("Draw to: %u, %u\n", x, y);
+  DEBUG("Draw to: (%u,%u)\n", x, y);
 
   int16_t cc_x, cc_w;
   xy_to_cc(x, y, &cc_x, &cc_w);
   int16_t cc_y_top, cc_y_bot;
   z_to_cc(wall_top_z, &cc_y_top);
   z_to_cc(wall_bot_z, &cc_y_bot);
-  DEBUG("Draw to: (%d,[%d,%d],%d)\n", cc_x, cc_y_top, cc_y_bot, cc_w);
+  DEBUG_CC("Draw to", cc);
 
   if (!wall_on_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, cc_x,
                       cc_y_top, cc_y_bot, cc_w)) {
@@ -98,6 +106,11 @@ static void draw_to(uint16_t x, uint16_t y) {
   }
 
   draw_to_cc(cc_x, cc_y_top, cc_y_bot, cc_w);
+  cur_cc_x = cc_x;
+  cur_cc_y_top = cc_y_top;
+  cur_cc_y_bot = cc_y_bot;
+  cur_cc_w = cc_w;
+  update_cur();
 }
 
 static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
@@ -105,17 +118,21 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
 
 static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
                        int16_t cc_w) {
-  DEBUG("Draw to cc: (%d,[%d,%d],%d)\n", cc_x, cc_y_top, cc_y_bot, cc_w);
+  DEBUG_CC("Draw to cc", cc);
   bool on_screen = in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w);
-  DEBUG("in frustum: %d\n", on_screen);
+  DEBUG("%s frustum\n", on_screen ? "In" : "Not in");
   if (cur_on_screen && on_screen) {
     uint16_t sx, sy_top, sy_bot;
     to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
-    DEBUG("Screen: (%u,[%u,%u])\n", sx, sy_top, sy_bot);
+    DEBUG_SCREEN("Screen:");
     wall_draw_to(1, sx, sy_top, sy_bot);
   } else {
     draw_clipped(cc_x, cc_y_top, cc_y_bot, cc_w);
   }
+
+  // Note: This may be clipped, and is set for the benefit of a later draw_to_cc
+  // call that is part of the same logical wall, not for the benefit of the next
+  // draw_to.
   cur_cc_x = cc_x;
   cur_cc_y_top = cc_y_top;
   cur_cc_y_bot = cc_y_bot;
@@ -132,7 +149,8 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
 
   if (cur_cc_x < -cur_cc_w && cc_x >= -cc_w) {
     DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
-    DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_cc_x, cur_cc_w, cc_x, cc_w);
+    DEBUG_CC("Cur", cur_cc);
+    DEBUG_CC("Next", cc);
     // r(t) = cur + vt
     // w(t)_x = -w(t)_w
     // cur_x + dxt = -cur_w - dw*t;
@@ -144,7 +162,7 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     int16_t t_denom = dx + dw;
     cur_cc_x += (int32_t)dx * t_num / t_denom;
     cur_cc_w += (int32_t)dw * t_num / t_denom;
-    DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_cc_x, cur_cc_w, cc_x, cc_w);
+    DEBUG_CC("Clipped Cur", cur_cc);
     update_cur();
   } else if (cur_cc_x > cur_cc_w && cc_x <= cc_w) {
     DEBUG("Wall crosses right frustum edge from right to left. Backface "
@@ -155,7 +173,8 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
           "culling.\n");
   } else if (cc_x > cc_w && cur_cc_x <= cur_cc_w) {
     DEBUG("Wall crosses right frustum edge from left to right. Clipping.\n");
-    DEBUG("Prev: (%d,%d) to (%d, %d)\n", cur_cc_x, cur_cc_w, cc_x, cc_w);
+    DEBUG_CC("Cur", cur_cc);
+    DEBUG_CC("Next", cc);
     // r(t) = next + vt
     // r(t)_x = r(t)_w
     // next_x + dx*t = next_w + dw*t;
@@ -167,18 +186,25 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     int16_t t_denom = dx - dw;
     cc_x += (int32_t)dx * t_num / t_denom;
     cc_w += (int32_t)dw * t_num / t_denom;
-    DEBUG("Clipped: (%d,%d) to (%d, %d)\n", cur_cc_x, cur_cc_w, cc_x, cc_w);
+    DEBUG_CC("Clipped Next", cc);
   }
   if (cur_cc_y_top > cur_cc_w && cc_y_top > cc_w) {
     DEBUG("Wall left and right edge cross frustum top. Clipping.\n");
+
+    DEBUG_CC("Cur", cur_cc);
     cur_cc_y_top = cur_cc_w;
+    DEBUG_CC("Clipped Cur", cur_cc);
     update_cur();
+
+    DEBUG_CC("Next", cc);
     cc_y_top = cc_w;
+    DEBUG_CC("Clipped Next", cc);
   } else if (cur_cc_y_top > cur_cc_w && cc_y_top <= cc_w ||
              cc_y_top > cc_w && cur_cc_y_top <= cur_cc_w) {
     DEBUG("Wall top edge crosses frustum top. Clipping.\n");
-    DEBUG("Prev: (x,%d-y,%d) to (x,%d-y,%d)\n", cur_cc_y_top, cur_cc_w,
-          cc_y_top, cc_w);
+    DEBUG_CC("Cur", cur_cc);
+    DEBUG_CC("Next", cc);
+
     // r(t) = cur + vt
     // r(t)_y = r(t)_w
     // cur_y + dyt = cur_w + dwt
@@ -189,28 +215,34 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
     int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
     int16_t isect_cc_w = isect_cc_y_top;
-    DEBUG("Intersection: (%d,[%d,%d],%d)\n", isect_cc_x, isect_cc_y_top,
-          isect_cc_y_bot, isect_cc_w);
+    DEBUG_CC("Intersection", isect_cc);
     if (cur_cc_y_top > cur_cc_w) {
       cur_cc_y_top = cur_cc_w;
+      DEBUG_CC("Clipped Cur:", cur_cc);
       update_cur();
     } else {
       cc_y_top = cc_w;
+      DEBUG_CC("Clipped Next:", cc);
     }
-    DEBUG("Clipped: (x,%d-y,%d) to (x,%d-y, %d)\n", cur_cc_y_top, cur_cc_w,
-          cc_y_top, cc_w);
     draw_to_cc(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
   }
   if (cur_cc_y_bot < -cur_cc_w && cc_y_bot < -cc_w) {
     DEBUG("Wall left and right edge cross frustum bottom. Clipping.\n");
+
+    DEBUG_CC("Cur", cur_cc);
     cur_cc_y_bot = -cur_cc_w;
+    DEBUG_CC("Clipped Cur", cur_cc);
     update_cur();
+
+    DEBUG_CC("Next", cc);
     cc_y_bot = -cc_w;
+    DEBUG_CC("Clipped Next", cc);
   } else if (cur_cc_y_bot < -cur_cc_w && cc_y_bot >= -cc_w ||
              cc_y_bot < -cc_w && cur_cc_y_bot >= -cur_cc_w) {
     DEBUG("Wall bottom edge crosses frustum bottom. Clipping.\n");
-    DEBUG("Prev: (x,[y,%d],%d) to (x,[y,%d],%d)\n", cur_cc_y_bot, cur_cc_w,
-          cc_y_bot, cc_w);
+    DEBUG_CC("Cur", cur_cc);
+    DEBUG_CC("Next", cc);
+
     // r(t) = cur + vt
     // r(t)_y = -r(t)_w
     // cur_y + dyt = -cur_w - dwt
@@ -221,22 +253,22 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
     int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
     int16_t isect_cc_w = isect_cc_y_bot;
-    DEBUG("Intersection: (%d,[%d,%d],%d)\n", isect_cc_x, isect_cc_y_top,
-          isect_cc_y_bot, isect_cc_w);
+    DEBUG_CC("Intersection", isect_cc);
+
     if (cur_cc_y_bot < -cur_cc_w) {
       cur_cc_y_bot = -cur_cc_w;
+      DEBUG_CC("Clipped Cur:", cur_cc);
       update_cur();
     } else {
       cc_y_bot = -cc_w;
+      DEBUG_CC("Clipped Next:", cc);
     }
-    DEBUG("Clipped: (x,[y,%d],%d) to (x,[y,%d], %d)\n", cur_cc_y_bot, cur_cc_w,
-          cc_y_bot, cc_w);
     draw_to_cc(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
   }
-  if (in_frustum(cc_w, cc_x, cc_y_top, cc_y_bot)) {
+  if (in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w)) {
     DEBUG("Next in frustum.\n");
     uint16_t sx, sy_top, sy_bot;
-    to_screen(cc_w, cc_x, cc_y_top, cc_y_bot, &sx, &sy_top, &sy_bot);
+    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
     DEBUG("Screen: (%u,[%u,%u])\n", sx, sy_top, sy_bot);
     if (cur_on_screen)
       wall_draw_to(1, sx, sy_top, sy_bot);
