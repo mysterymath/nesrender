@@ -47,15 +47,11 @@ int main() {
       else
         oam_clear();
     }
-    if (pad & PAD_B) {
-      if (overhead_view) {
-        if (pad & PAD_UP)
-          overhead::scale_up();
-        else if (pad & PAD_DOWN)
-          overhead::scale_down();
-      } else if (player.z == 50) {
-        player.dz = 8;
-      }
+    if (overhead_view && pad & PAD_B) {
+      if (pad & PAD_UP)
+        overhead::scale_up();
+      else if (pad & PAD_DOWN)
+        overhead::scale_down();
     } else {
       if (pad & PAD_UP)
         player.forward();
@@ -73,6 +69,8 @@ int main() {
           player.turn_right();
       }
     }
+    if (!overhead_view && pad_t & PAD_B && player.z == 50)
+      player.dz = 8;
     player.z += player.dz;
     player.dz -= 2;
     if (player.z < 50) {
