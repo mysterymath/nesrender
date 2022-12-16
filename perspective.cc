@@ -11,13 +11,14 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
 void perspective::render() {
+  DEBUG("Begin frame.\n");
   clear_screen();
   move_to(100, 100);
   draw_to(100, 200);
@@ -53,7 +54,8 @@ static void update_cur();
         NAME##_w)
 
 #define DEBUG_SCREEN(PREFIX)                                                   \
-  DEBUG("%s: (%u,[%u,%u])\n", PREFIX, sx, sy_top, sy_bot)
+  DEBUG("%s: (%d,[%d,%d])\n", PREFIX, (int16_t)sx / 256 - 5,                   \
+        (int16_t)sy_top / 256 - 5, (int16_t)sy_bot / 256 - 5)
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
@@ -147,7 +149,7 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
   int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
   int16_t dw = cc_w - cur_cc_w;
 
-  if (cur_cc_x < -cur_cc_w && cc_x >= -cc_w) {
+  if (cur_cc_x < -cur_cc_w) {
     DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
     DEBUG_CC("Cur", cur_cc);
     DEBUG_CC("Next", cc);
@@ -161,31 +163,52 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     int16_t t_num = -cur_cc_w - cur_cc_x;
     int16_t t_denom = dx + dw;
     cur_cc_x += (int32_t)dx * t_num / t_denom;
-    cur_cc_w += (int32_t)dw * t_num / t_denom;
+    cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
+    cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
+    cur_cc_w = -cur_cc_x;
     DEBUG_CC("Clipped Cur", cur_cc);
     update_cur();
-  } else if (cur_cc_x > cur_cc_w && cc_x <= cc_w) {
-    DEBUG("Wall crosses right frustum edge from right to left. Backface "
-          "culling.\n");
+  } else if (cc_x < -cc_w) {
+    DEBUG("Wall crosses left frustum edge from right to left. Clipping.\n");
+    DEBUG_CC("Cur", cur_cc);
+    DEBUG_CC("Next", cc);
+    int16_t t_num = -cc_w - cc_x;
+    int16_t t_denom = dx + dw;
+    cc_x += (int32_t)dx * t_num / t_denom;
+    cc_y_top += (int32_t)dy_top * t_num / t_denom;
+    cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
+    cc_w = -cc_x;
+    DEBUG_CC("Clipped Next", cc);
   }
-  if (cc_x < -cc_w && cur_cc_x >= -cur_cc_w) {
-    DEBUG("Wall crosses left frustum edge from right to left. Backface "
-          "culling.\n");
-  } else if (cc_x > cc_w && cur_cc_x <= cur_cc_w) {
+  if (cur_cc_x > cur_cc_w) {
+    DEBUG("Wall crosses right frustum edge from right to left. Clipping.\n");
+    DEBUG_CC("Cur", cur_cc);
+    DEBUG_CC("Next", cc);
+    // r(t) = cur + vt
+    // r(t)_x = r(t)_w
+    // cur_x + dx*t = cur_w + dw*t;
+    // t*(dx - dw) = cur_w - cur_x
+    // t = (cur_w - cur_x) / (dx - dw)
+    // Since the wall cannot be parallel to the right frustum edge, dx - dw !=
+    // 0.
+    int16_t t_num = cur_cc_w - cur_cc_x;
+    int16_t t_denom = dx - dw;
+    cur_cc_x += (int32_t)dx * t_num / t_denom;
+    cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
+    cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
+    cur_cc_w = cur_cc_x;
+    DEBUG_CC("Clipped Cur", cur_cc);
+    update_cur();
+  } else if (cc_x > cc_w) {
     DEBUG("Wall crosses right frustum edge from left to right. Clipping.\n");
     DEBUG_CC("Cur", cur_cc);
     DEBUG_CC("Next", cc);
-    // r(t) = next + vt
-    // r(t)_x = r(t)_w
-    // next_x + dx*t = next_w + dw*t;
-    // t*(dx - dw) = next_w - next_x
-    // t = (next_w - next_x) / (dx - dw)
-    // Since the wall cannot be parallel to the right frustum edge, dx - dw !=
-    // 0.
     int16_t t_num = cc_w - cc_x;
     int16_t t_denom = dx - dw;
     cc_x += (int32_t)dx * t_num / t_denom;
-    cc_w += (int32_t)dw * t_num / t_denom;
+    cc_y_top += (int32_t)dy_top * t_num / t_denom;
+    cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
+    cc_w = cc_x;
     DEBUG_CC("Clipped Next", cc);
   }
   if (cur_cc_y_top > cur_cc_w && cc_y_top > cc_w) {
@@ -199,8 +222,7 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     DEBUG_CC("Next", cc);
     cc_y_top = cc_w;
     DEBUG_CC("Clipped Next", cc);
-  } else if (cur_cc_y_top > cur_cc_w && cc_y_top <= cc_w ||
-             cc_y_top > cc_w && cur_cc_y_top <= cur_cc_w) {
+  } else if (cur_cc_y_top > cur_cc_w || cc_y_top > cc_w) {
     DEBUG("Wall top edge crosses frustum top. Clipping.\n");
     DEBUG_CC("Cur", cur_cc);
     DEBUG_CC("Next", cc);
@@ -237,8 +259,7 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     DEBUG_CC("Next", cc);
     cc_y_bot = -cc_w;
     DEBUG_CC("Clipped Next", cc);
-  } else if (cur_cc_y_bot < -cur_cc_w && cc_y_bot >= -cc_w ||
-             cc_y_bot < -cc_w && cur_cc_y_bot >= -cur_cc_w) {
+  } else if (cur_cc_y_bot < -cur_cc_w || cc_y_bot < -cc_w) {
     DEBUG("Wall bottom edge crosses frustum bottom. Clipping.\n");
     DEBUG_CC("Cur", cur_cc);
     DEBUG_CC("Next", cc);
@@ -252,7 +273,7 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     int16_t isect_cc_x = cur_cc_x + (int32_t)dx * t_num / t_denom;
     int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
     int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
-    int16_t isect_cc_w = isect_cc_y_bot;
+    int16_t isect_cc_w = -isect_cc_y_bot;
     DEBUG_CC("Intersection", isect_cc);
 
     if (cur_cc_y_bot < -cur_cc_w) {
@@ -269,7 +290,7 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
     DEBUG("Next in frustum.\n");
     uint16_t sx, sy_top, sy_bot;
     to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
-    DEBUG("Screen: (%u,[%u,%u])\n", sx, sy_top, sy_bot);
+    DEBUG_SCREEN("Screen");
     if (cur_on_screen)
       wall_draw_to(1, sx, sy_top, sy_bot);
     else
@@ -293,7 +314,7 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) {
   // When the frustum is 2w wide, y = x = w. Then the frustum must be 2h tall,
   // and z = kx = h. So kw = h, and k = h/w.
   // The line z=h/wx should map to (1,1), so scale by the inverse factor.
-  *cc_y = -vz * (int32_t)screen_width / screen_height;
+  *cc_y = vz * (int32_t)screen_width / screen_height;
 }
 
 static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
@@ -301,9 +322,9 @@ static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
                       uint16_t *sy_bot) {
   *sx = (int32_t)cc_x * (screen_width / 2) * 256 / cc_w +
         screen_width / 2 * 256 + screen_guard;
-  *sy_top = (int32_t)cc_y_top * (screen_height / 2) * 256 / cc_w +
+  *sy_top = (int32_t)-cc_y_top * (screen_height / 2) * 256 / cc_w +
             screen_height / 2 * 256 + screen_guard;
-  *sy_bot = (int32_t)cc_y_bot * (screen_height / 2) * 256 / cc_w +
+  *sy_bot = (int32_t)-cc_y_bot * (screen_height / 2) * 256 / cc_w +
             screen_height / 2 * 256 + screen_guard;
 }
 
