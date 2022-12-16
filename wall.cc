@@ -52,7 +52,7 @@ void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
   to_x -= screen_guard;
 
   uint8_t *fb_col = &fb_next[x / 256 / 2 * 30];
-  const auto y_pix = [&](int16_t y) -> uint8_t {
+  const auto y_pix = [&](uint16_t y) -> uint8_t {
     if (y < screen_guard)
       return 0;
     if (y > screen_height * 256 + screen_guard)
@@ -77,9 +77,9 @@ void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
     y_bot += m_bot;
     x += dx;
   }
-  cur_x = x + screen_guard;
-  cur_y_top = y_top;
-  cur_y_bot = y_bot;
+  cur_x = to_x + screen_guard;
+  cur_y_top = to_y_top;
+  cur_y_bot = to_y_bot;
 }
 
 // Note: y_bot is exclusive.
@@ -87,6 +87,7 @@ template <bool x_odd>
 void draw_column(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot) {
   if (y_top >= y_bot)
     return;
+  DEBUG("%d, %d, %d\n", (col - fb_next) / 30, y_top, y_bot);
   uint8_t i = y_top / 2;
   if (y_top & 1) {
     if (x_odd) {

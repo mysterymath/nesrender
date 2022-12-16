@@ -11,7 +11,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -44,8 +44,8 @@ static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
 static bool cur_on_screen;
 
-constexpr int16_t wall_top_z = 60;
-constexpr int16_t wall_bot_z = 40;
+constexpr int16_t wall_top_z = 80;
+constexpr int16_t wall_bot_z = 20;
 
 static void update_cur();
 
