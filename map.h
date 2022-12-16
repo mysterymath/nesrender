@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 struct Player {
-  uint16_t x = 150;
-  uint16_t y = 150;
+  uint16_t x = 500;
+  uint16_t y = 500;
   uint16_t z = 50;
   uint16_t ang = 0;
 

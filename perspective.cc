@@ -20,11 +20,12 @@ static void draw_to(uint16_t x, uint16_t y);
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
-  move_to(100, 100);
-  draw_to(100, 200);
-  draw_to(200, 200);
-  draw_to(200, 100);
-  draw_to(100, 100);
+  move_to(400, 400);
+  draw_to(400, 600);
+  draw_to(600, 600);
+  draw_to(500, 500);
+  draw_to(600, 400);
+  draw_to(400, 400);
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
