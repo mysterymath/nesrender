@@ -11,7 +11,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-// #define DEBUG_FILE
+#define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -54,8 +54,9 @@ static void update_cur();
         NAME##_w)
 
 #define DEBUG_SCREEN(PREFIX)                                                   \
-  DEBUG("%s: (%d,[%d,%d])\n", PREFIX, (int16_t)sx / 256 - 5,                   \
-        (int16_t)sy_top / 256 - 5, (int16_t)sy_bot / 256 - 5)
+  DEBUG("%s: (%d:%d,[%d:%d,%d:%d])\n", PREFIX, (int16_t)sx / 256 - 5,          \
+        sx % 256, (int16_t)sy_top / 256 - 5, sy_top % 256,                     \
+        (int16_t)sy_bot / 256 - 5, sy_bot % 256)
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
