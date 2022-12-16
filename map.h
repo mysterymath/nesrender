@@ -9,6 +9,8 @@ struct Player {
   uint16_t z = 50;
   uint16_t ang = 0;
 
+  uint16_t dz = 0;
+
   void forward();
   void backward();
   void turn_left();
