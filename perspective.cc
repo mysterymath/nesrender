@@ -20,73 +20,38 @@ static void draw_to(uint16_t x, uint16_t y);
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
-  move_to(400, 400);
-  draw_to(400, 600);
-  draw_to(600, 600);
-  draw_to(500, 500);
+  // move_to(400, 400);
+  // draw_to(400, 600);
+  // draw_to(600, 600);
+  // draw_to(500, 500);
+  // draw_to(600, 400);
+  // draw_to(400, 400);
+
+  move_to(600, 600);
   draw_to(600, 400);
-  draw_to(400, 400);
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
 static void z_to_cc(uint16_t z, int16_t *cc_y);
-static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                      int16_t cc_w, uint16_t *sx, uint16_t *sy_top,
-                      uint16_t *sy_bot);
-static bool in_frustum(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w);
-static bool wall_on_screen(int16_t cc_x1, int16_t cc_y_top1, int16_t cc_y_bot1,
-                           int16_t cc_w1, int16_t cc_x2, int16_t cc_y_top2,
-                           int16_t cc_y_bot2, int16_t cc_w2);
 
 static int16_t cur_cc_x;
 static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
-static bool cur_on_screen;
 
 constexpr int16_t wall_top_z = 80;
 constexpr int16_t wall_bot_z = 20;
 
-static void update_cur();
-
 #define DEBUG_CC(PREFIX, NAME)                                                 \
   DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
         NAME##_w)
-
-#define DEBUG_SCREEN(PREFIX)                                                   \
-  DEBUG("%s: (%d:%d,[%d:%d,%d:%d])\n", PREFIX, (int16_t)sx / 256 - 5,          \
-        sx % 256, (int16_t)sy_top / 256 - 5, sy_top % 256,                     \
-        (int16_t)sy_bot / 256 - 5, sy_bot % 256)
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
   xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
   z_to_cc(wall_top_z, &cur_cc_y_top);
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
-  update_cur();
 }
-
-static void update_cur() {
-  DEBUG_CC("Update cur", cur_cc);
-  DEBUG("\n");
-  if (in_frustum(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w)) {
-    DEBUG("In frustum.\n");
-    uint16_t sx, sy_top, sy_bot;
-    to_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, &sx, &sy_top,
-              &sy_bot);
-
-    DEBUG_SCREEN("Screen: ");
-    wall_move_to(sx, sy_top, sy_bot);
-    cur_on_screen = true;
-  } else {
-    DEBUG("Not in frustum.\n");
-    cur_on_screen = false;
-  }
-}
-
-static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w);
 
 static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
@@ -98,206 +63,10 @@ static void draw_to(uint16_t x, uint16_t y) {
   z_to_cc(wall_bot_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
 
-  if (!wall_on_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, cc_x,
-                      cc_y_top, cc_y_bot, cc_w)) {
-    cur_cc_x = cc_x;
-    cur_cc_y_top = cc_y_top;
-    cur_cc_y_bot = cc_y_bot;
-    cur_cc_w = cc_w;
-    cur_on_screen = false;
-    DEBUG("Wall entirely outside frustum. Culled.\n");
-    return;
-  }
-
-  draw_to_cc(cc_x, cc_y_top, cc_y_bot, cc_w);
   cur_cc_x = cc_x;
   cur_cc_y_top = cc_y_top;
   cur_cc_y_bot = cc_y_bot;
   cur_cc_w = cc_w;
-  update_cur();
-}
-
-static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                         int16_t cc_w);
-
-static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w) {
-  DEBUG_CC("Draw to cc", cc);
-  bool on_screen = in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w);
-  DEBUG("%s frustum\n", on_screen ? "In" : "Not in");
-  if (cur_on_screen && on_screen) {
-    uint16_t sx, sy_top, sy_bot;
-    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
-    DEBUG_SCREEN("Screen:");
-    wall_draw_to(1, sx, sy_top, sy_bot);
-  } else {
-    draw_clipped(cc_x, cc_y_top, cc_y_bot, cc_w);
-  }
-
-  // Note: This may be clipped, and is set for the benefit of a later draw_to_cc
-  // call that is part of the same logical wall, not for the benefit of the next
-  // draw_to.
-  cur_cc_x = cc_x;
-  cur_cc_y_top = cc_y_top;
-  cur_cc_y_bot = cc_y_bot;
-  cur_cc_w = cc_w;
-  cur_on_screen = on_screen;
-}
-
-static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                         int16_t cc_w) {
-  int16_t dx = cc_x - cur_cc_x;
-  int16_t dy_top = cc_y_top - cur_cc_y_top;
-  int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
-  int16_t dw = cc_w - cur_cc_w;
-
-  if (cur_cc_x < -cur_cc_w) {
-    DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    // r(t) = cur + vt
-    // w(t)_x = -w(t)_w
-    // cur_x + dxt = -cur_w - dw*t;
-    // t*(dx + dw) = -cur_w - cur_x
-    // t = (-cur_w - cur_x) / (dx + dw)
-    // Since the wall cannot be parallel to the left frustum edge, dw + dx !=
-    // 0.
-    int16_t t_num = -cur_cc_w - cur_cc_x;
-    int16_t t_denom = dx + dw;
-    cur_cc_x += (int32_t)dx * t_num / t_denom;
-    cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cur_cc_w = -cur_cc_x;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-  } else if (cc_x < -cc_w) {
-    DEBUG("Wall crosses left frustum edge from right to left. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    int16_t t_num = -cc_w - cc_x;
-    int16_t t_denom = dx + dw;
-    cc_x += (int32_t)dx * t_num / t_denom;
-    cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cc_w = -cc_x;
-    DEBUG_CC("Clipped Next", cc);
-  }
-  if (cur_cc_x > cur_cc_w) {
-    DEBUG("Wall crosses right frustum edge from right to left. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    // r(t) = cur + vt
-    // r(t)_x = r(t)_w
-    // cur_x + dx*t = cur_w + dw*t;
-    // t*(dx - dw) = cur_w - cur_x
-    // t = (cur_w - cur_x) / (dx - dw)
-    // Since the wall cannot be parallel to the right frustum edge, dx - dw !=
-    // 0.
-    int16_t t_num = cur_cc_w - cur_cc_x;
-    int16_t t_denom = dx - dw;
-    cur_cc_x += (int32_t)dx * t_num / t_denom;
-    cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cur_cc_w = cur_cc_x;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-  } else if (cc_x > cc_w) {
-    DEBUG("Wall crosses right frustum edge from left to right. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    int16_t t_num = cc_w - cc_x;
-    int16_t t_denom = dx - dw;
-    cc_x += (int32_t)dx * t_num / t_denom;
-    cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cc_w = cc_x;
-    DEBUG_CC("Clipped Next", cc);
-  }
-  if (cur_cc_y_top > cur_cc_w && cc_y_top > cc_w) {
-    DEBUG("Wall left and right edge cross frustum top. Clipping.\n");
-
-    DEBUG_CC("Cur", cur_cc);
-    cur_cc_y_top = cur_cc_w;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-
-    DEBUG_CC("Next", cc);
-    cc_y_top = cc_w;
-    DEBUG_CC("Clipped Next", cc);
-  } else if (cur_cc_y_top > cur_cc_w || cc_y_top > cc_w) {
-    DEBUG("Wall top edge crosses frustum top. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-
-    // r(t) = cur + vt
-    // r(t)_y = r(t)_w
-    // cur_y + dyt = cur_w + dwt
-    // t = (cur_w - cur_y) / (dy - dw)
-    int16_t t_num = cur_cc_w - cur_cc_y_top;
-    int16_t t_denom = dy_top - dw;
-    int16_t isect_cc_x = cur_cc_x + (int32_t)dx * t_num / t_denom;
-    int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
-    int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
-    int16_t isect_cc_w = isect_cc_y_top;
-    DEBUG_CC("Intersection", isect_cc);
-    if (cur_cc_y_top > cur_cc_w) {
-      cur_cc_y_top = cur_cc_w;
-      DEBUG_CC("Clipped Cur:", cur_cc);
-      update_cur();
-    } else {
-      cc_y_top = cc_w;
-      DEBUG_CC("Clipped Next:", cc);
-    }
-    draw_to_cc(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
-  }
-  if (cur_cc_y_bot < -cur_cc_w && cc_y_bot < -cc_w) {
-    DEBUG("Wall left and right edge cross frustum bottom. Clipping.\n");
-
-    DEBUG_CC("Cur", cur_cc);
-    cur_cc_y_bot = -cur_cc_w;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-
-    DEBUG_CC("Next", cc);
-    cc_y_bot = -cc_w;
-    DEBUG_CC("Clipped Next", cc);
-  } else if (cur_cc_y_bot < -cur_cc_w || cc_y_bot < -cc_w) {
-    DEBUG("Wall bottom edge crosses frustum bottom. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-
-    // r(t) = cur + vt
-    // r(t)_y = -r(t)_w
-    // cur_y + dyt = -cur_w - dwt
-    // t = (-cur_w - cur_y) / (dy + dw)
-    int16_t t_num = -cur_cc_w - cur_cc_y_bot;
-    int16_t t_denom = dy_bot + dw;
-    int16_t isect_cc_x = cur_cc_x + (int32_t)dx * t_num / t_denom;
-    int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
-    int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
-    int16_t isect_cc_w = -isect_cc_y_bot;
-    DEBUG_CC("Intersection", isect_cc);
-
-    if (cur_cc_y_bot < -cur_cc_w) {
-      cur_cc_y_bot = -cur_cc_w;
-      DEBUG_CC("Clipped Cur:", cur_cc);
-      update_cur();
-    } else {
-      cc_y_bot = -cc_w;
-      DEBUG_CC("Clipped Next:", cc);
-    }
-    draw_to_cc(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
-  }
-  if (in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w)) {
-    DEBUG("Next in frustum.\n");
-    uint16_t sx, sy_top, sy_bot;
-    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
-    DEBUG_SCREEN("Screen");
-    if (cur_on_screen)
-      wall_draw_to(1, sx, sy_top, sy_bot);
-    else
-      wall_move_to(sx, sy_top, sy_bot);
-  }
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
@@ -309,61 +78,96 @@ static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
   *cc_w = vx;
 }
 
-static void z_to_cc(uint16_t z, int16_t *cc_y) {
-  int16_t vz = z - player.z;
-  // The frustum's top world coordinate is z = kx, for some k.
-  // The frustum's left world coordinate is y = x.
-  // When the frustum is 2w wide, y = x = w. Then the frustum must be 2h tall,
-  // and z = kx = h. So kw = h, and k = h/w.
-  // The line z=h/wx should map to (1,1), so scale by the inverse factor.
-  *cc_y = vz * (int32_t)screen_width / screen_height;
-}
+static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 
-static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                      int16_t cc_w, uint16_t *sx, uint16_t *sy_top,
-                      uint16_t *sy_bot) {
-  *sx = (int32_t)cc_x * (screen_width / 2) * 256 / cc_w +
-        screen_width / 2 * 256 + screen_guard;
-  *sy_top = (int32_t)-cc_y_top * (screen_height / 2) * 256 / cc_w +
-            screen_height / 2 * 256 + screen_guard;
-  *sy_bot = (int32_t)-cc_y_bot * (screen_height / 2) * 256 / cc_w +
-            screen_height / 2 * 256 + screen_guard;
-}
+// The following is an interpretation of Olano and Greer's homogenous
+// rasterization for wall quads.
+//
+// The wall is a rectangle in 3d (x,y,w) clip space. Each edge of the rectangle
+// is a line in clip space, but since the space is a homogenous representation
+// of the project space, they each define a plane through the origin. A normal
+// for that plane is a vector orthogonal to the vertices of the edge, i.e.,
+// their cross product. The plane consists of all points orthogonal to the
+// cross product, i.e., the dot product is zero.
+//
+// Accordingly, if the edge runs from (x0,y0,w0) to (x1,y1,w1), then the equation for the plane is:
+// [x,y,z] * [x0,y0,w0] x [x1,y1,w1] = 0.
+// Expanding, this gives:
+// (1,2,3),
+// (y0w1 - w0y1) * x + (w0x1 - x0w1) * y + (x0y1 - y0x1) * w = 0
+//
+// Note that the left hand side of the equation is linear in clip space, and it
+// crosses from negative to positive exactly where it intersects the edge plane.
+// (The equation can be negated if necessary to make this so.) We can then
+// compute this function for all four edges, and a clip point is in the wall's
+// frustum iff all four LHS are positive.
+//
+// Dividing the LHS by w gives us an expression that is linear in screen space,
+// not clip space:
+// (y0w1 - w0y1) * x / w + (w0x1 - x0w1) * y / w + (x0y1 - y0x1) This can be
+// linearly interpolated for each pixel on the screen. Note that if w < 0, the
+// sign would be flipped from the true value of the expression in clip space.
+// But, we only care to query pixel positions within the view frustum, so we can
+// always select some arbitrary positive w, and this ensures that the sign of
+// this expression agrees with its clip space equivalent.
+//
+// I call it "clip space", but by this I just mean that the homogenous
+// coordinate has taken on the z necessary to perform the perspective divide. In
+// this approach, it's not necessary to perform this divide (or actually, any
+// divisions at all!), nor is it necessary to normalize the clip space so that
+// the frustum bouds are +-1.
+//
+// Let's arbitrarily take w to be 1; the expression then becomes:
+// (y0w1 - w0y1) * x + (w0x1 - x0w1) * y + (x0y1 - y0x1)
+// 
+// If w=1, then the screen frustum bounds are {[-1,1],[-ht/wt, ht/wt]}.  This is
+// divided evenly into w columns and h rows, each 2/wt in width and 2/wt in
+// height (let's not do rectangular pixels for now). 
+//
+// Accordingly, the top left pixel has bounds {[-1,-1+2/wt],[ht/wt-2/wt, ht/wt]}.
+// It's center is [-1+2/wt/2, ht/wt-2/wt/2] = [-1+1/wt, ht/wt-1/wt]
+// To advance screen x or screen y by one pixel, we add 2/wt. To decrease screen
+// y by one pixel, we subtract 2/wt. With thipls, we can zig zag across the
+// screen, linearly interpolating along the way.
+//
+// We can plug this directly into the above formula.
+// The value of the expression at the top left pixel center is this:
+// (y0w1 - w0y1) * (-1+1/wt) + (w0x1 - x0w1) * (ht/wt-1/wt) + (x0y1 - y0x1)
+//
+// Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2 / wt
+// Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2 / wt
+//
+// Now, another observation: we still only care about the sign of this
+// expression, and multiplying the start and the increments by a positive
+// constant does not change the sign. Accordingly, we can multply by wt, and get:
+//
+// Top left: (y0w1 - w0y1) * (1-wt) + (w0x1 - x0w1) * (ht-1) + (x0y1 - y0x1) * wt
+// Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2
+// Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2
+//
+// We can give the coefficients names:
+// a = y0w1 - w0y1
+// b = w0x1 - x0w1
+// c = x0y1 - y0x1
+// Top left: a*(1-wt) + b*(ht-1) + c*wt
+// dX: a*2
+// dY: b*2
+//
+// Finally, we can compute the coefficients for each quad edge:
+// Left: (x_min,y_top,w_x_min) to (x_min, y_bot, w_x_min)
+// a = y_top*w_x_min - w_x_min*y_bot = w_x_min * (y_top - y_bot)
+// b = w_x_min*x_min - w_x_min * x_min = 0
+// c = x_min*y_bot - y_top*x_min = x_min * (y_bot - y_top)
+// Left = w_x_min * (y_top - y_bot) * x - x_min * (y_top - y_bot)
+// We can divide this by (y_top - y_bot) without changing the sign:
+// Left = w_x_min * x - x_min
+// a = w_x_min, b = 0, c = -x_min
+// Then, it's just a matter of checking whether a point along the right end is
+// negative, and multiplying the coefficients by -1 if so.
+// This gives:
+// Top left: w_x_min*(1-wt) - x_min*wt
+// dX: w_x_min*2
+// dY: 0
 
-static constexpr int16_t frustum_guard = 1;
-
-static bool in_frustum(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w) {
-  if (cc_w <= 0)
-    return false;
-  // Using a FOV of 90 degrees, the frustum left and right are defined by y =
-  // +-w.
-  if (abs(cc_x) > cc_w + frustum_guard)
-    return false;
-
-  if (abs(cc_y_top) > cc_w + frustum_guard)
-    return false;
-  return abs(cc_y_bot) <= cc_w + frustum_guard;
-}
-
-static bool wall_on_screen(int16_t cc_x1, int16_t cc_y_top1, int16_t cc_y_bot1,
-                           int16_t cc_w1, int16_t cc_x2, int16_t cc_y_top2,
-                           int16_t cc_y_bot2, int16_t cc_w2) {
-  if (cc_x1 < -cc_w1 && cc_x2 < -cc_w2) {
-    DEBUG("Both points to the left of left frustum edge.\n");
-    return false;
-  }
-  if (cc_x1 > cc_w1 && cc_x2 > cc_w2) {
-    DEBUG("Both points to the right of right frustum edge.\n");
-    return false;
-  }
-  if (cc_y_bot1 > cc_w1 && cc_y_bot2 > cc_w2) {
-    DEBUG("Bottom of both walls above top frustum edge.\n");
-    return false;
-  }
-  if (cc_y_top1 < -cc_w1 && cc_y_top2 < -cc_w2) {
-    DEBUG("Top of both walls below bottom frustum edge.\n");
-    return false;
-  }
-  return true;
-}
+// WIP: Let's actually try left in practice and see if it works correctly before
+// doing the others.
