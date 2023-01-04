@@ -20,6 +20,7 @@ static void draw_to(uint16_t x, uint16_t y);
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
+  clear_z();
   move_to(400, 400);
   draw_to(400, 600);
   draw_to(600, 600);
@@ -32,7 +33,7 @@ static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
 static void z_to_cc(uint16_t z, int16_t *cc_y);
 static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
                       int16_t cc_w, uint16_t *sx, uint16_t *sy_top,
-                      uint16_t *sy_bot);
+                      uint16_t *sy_bot, uint16_t *sz);
 static bool in_frustum(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
                        int16_t cc_w);
 static bool wall_on_screen(int16_t cc_x1, int16_t cc_y_top1, int16_t cc_y_bot1,
@@ -55,9 +56,9 @@ static void update_cur();
         NAME##_w)
 
 #define DEBUG_SCREEN(PREFIX)                                                   \
-  DEBUG("%s: (%d:%d,[%d:%d,%d:%d])\n", PREFIX, (int16_t)sx / 256 - 5,          \
+  DEBUG("%s: (%d:%d,[%d:%d,%d:%d],%u)\n", PREFIX, (int16_t)sx / 256 - 5,       \
         sx % 256, (int16_t)sy_top / 256 - 5, sy_top % 256,                     \
-        (int16_t)sy_bot / 256 - 5, sy_bot % 256)
+        (int16_t)sy_bot / 256 - 5, sy_bot % 256, sz)
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
@@ -72,12 +73,12 @@ static void update_cur() {
   DEBUG("\n");
   if (in_frustum(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w)) {
     DEBUG("In frustum.\n");
-    uint16_t sx, sy_top, sy_bot;
+    uint16_t sx, sy_top, sy_bot, sz;
     to_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, &sx, &sy_top,
-              &sy_bot);
+              &sy_bot, &sz);
 
     DEBUG_SCREEN("Screen: ");
-    wall_move_to(sx, sy_top, sy_bot);
+    wall_move_to(sx, sy_top, sy_bot, sz);
     cur_on_screen = true;
   } else {
     DEBUG("Not in frustum.\n");
@@ -126,10 +127,10 @@ static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
   bool on_screen = in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w);
   DEBUG("%s frustum\n", on_screen ? "In" : "Not in");
   if (cur_on_screen && on_screen) {
-    uint16_t sx, sy_top, sy_bot;
-    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
+    uint16_t sx, sy_top, sy_bot, sz;
+    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot, &sz);
     DEBUG_SCREEN("Screen:");
-    wall_draw_to(1, sx, sy_top, sy_bot);
+    wall_draw_to(1, sx, sy_top, sy_bot, sz);
   } else {
     draw_clipped(cc_x, cc_y_top, cc_y_bot, cc_w);
   }
@@ -290,13 +291,13 @@ static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
   }
   if (in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w)) {
     DEBUG("Next in frustum.\n");
-    uint16_t sx, sy_top, sy_bot;
-    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot);
+    uint16_t sx, sy_top, sy_bot, sz;
+    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot, &sz);
     DEBUG_SCREEN("Screen");
     if (cur_on_screen)
-      wall_draw_to(1, sx, sy_top, sy_bot);
+      wall_draw_to(1, sx, sy_top, sy_bot, sz);
     else
-      wall_move_to(sx, sy_top, sy_bot);
+      wall_move_to(sx, sy_top, sy_bot, sz);
   }
 }
 
@@ -321,13 +322,14 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) {
 
 static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
                       int16_t cc_w, uint16_t *sx, uint16_t *sy_top,
-                      uint16_t *sy_bot) {
+                      uint16_t *sy_bot, uint16_t *sz) {
   *sx = (int32_t)cc_x * (screen_width / 2) * 256 / cc_w +
         screen_width / 2 * 256 + screen_guard;
   *sy_top = (int32_t)-cc_y_top * (screen_height / 2) * 256 / cc_w +
             screen_height / 2 * 256 + screen_guard;
   *sy_bot = (int32_t)-cc_y_bot * (screen_height / 2) * 256 / cc_w +
             screen_height / 2 * 256 + screen_guard;
+  *sz = (int32_t)-65536 / cc_w;
 }
 
 static constexpr int16_t frustum_guard = 1;
