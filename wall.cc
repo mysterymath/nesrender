@@ -6,7 +6,7 @@
 #include "screen.h"
 #include "util.h"
 
-// #define DEBUG_FILE
+//#define DEBUG_FILE
 #include "debug.h"
 
 static uint16_t cur_x;
@@ -74,11 +74,17 @@ void wall_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y_top,
       return screen_height;
     return (y - screen_guard) / 256;
   };
-  for (; x / 256 != to_x / 256; y_top += m_top, y_bot += m_bot, z += m_z, x += dx) {
+  for (; x / 256 != to_x / 256;
+       y_top += m_top, y_bot += m_bot, z += m_z, x += dx) {
     uint16_t col_z = col_z_hi[x / 256] << 8 | col_z_lo[x / 256];
     DEBUG("z: %u, col_z: %u\n", z, col_z);
-    if (z >= col_z)
+    if (z >= col_z) {
+      DEBUG("Reject x: %u\n", x / 256);
+      if (x / 256 & 1)
+        fb_col += 30;
       continue;
+    }
+    DEBUG("New z for x=%u\n", x / 256);
     col_z_hi[x / 256] = z >> 8;
     col_z_lo[x / 256] = z & 0xff;
 
