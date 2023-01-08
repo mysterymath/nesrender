@@ -56,17 +56,17 @@ static void move_to(uint16_t x, uint16_t y) {
 static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
 
-  int16_t cc_x, cc_w;
-  xy_to_cc(x, y, &cc_x, &cc_w);
-  int16_t cc_y_top, cc_y_bot;
-  z_to_cc(wall_top_z, &cc_y_top);
-  z_to_cc(wall_bot_z, &cc_y_bot);
-  DEBUG_CC("Draw to", cc);
+  int16_t cc_to_x, cc_to_w;
+  xy_to_cc(x, y, &cc_to_x, &cc_to_w);
+  int16_t cc_to_y_top, cc_to_y_bot;
+  z_to_cc(wall_top_z, &cc_to_y_top);
+  z_to_cc(wall_bot_z, &cc_to_y_bot);
+  DEBUG_CC("Draw to", cc_to);
 
-  cur_cc_x = cc_x;
-  cur_cc_y_top = cc_y_top;
-  cur_cc_y_bot = cc_y_bot;
-  cur_cc_w = cc_w;
+  cur_cc_x = cc_to_x;
+  cur_cc_y_top = cc_to_y_top;
+  cur_cc_y_bot = cc_to_y_bot;
+  cur_cc_w = cc_to_w;
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
@@ -90,11 +90,10 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 // their cross product. The plane consists of all points orthogonal to the
 // cross product, i.e., the dot product is zero.
 //
-// Accordingly, if the edge runs from (x0,y0,w0) to (x1,y1,w1), then the equation for the plane is:
-// [x,y,z] * [x0,y0,w0] x [x1,y1,w1] = 0.
-// Expanding, this gives:
-// (1,2,3),
-// (y0w1 - w0y1) * x + (w0x1 - x0w1) * y + (x0y1 - y0x1) * w = 0
+// Accordingly, if the edge runs from (x0,y0,w0) to (x1,y1,w1), then the
+// equation for the plane is: [x,y,z] * [x0,y0,w0] x [x1,y1,w1] = 0. Expanding,
+// this gives: (1,2,3), (y0w1 - w0y1) * x + (w0x1 - x0w1) * y + (x0y1 - y0x1) *
+// w = 0
 //
 // Note that the left hand side of the equation is linear in clip space, and it
 // crosses from negative to positive exactly where it intersects the edge plane.
@@ -119,30 +118,32 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 //
 // Let's arbitrarily take w to be 1; the expression then becomes:
 // (y0w1 - w0y1) * x + (w0x1 - x0w1) * y + (x0y1 - y0x1)
-// 
+//
 // If w=1, then the screen frustum bounds are {[-1,1],[-ht/wt, ht/wt]}.  This is
 // divided evenly into w columns and h rows, each 2/wt in width and 2/wt in
-// height (let's not do rectangular pixels for now). 
+// height (let's not do rectangular pixels for now).
 //
-// Accordingly, the top left pixel has bounds {[-1,-1+2/wt],[ht/wt-2/wt, ht/wt]}.
-// It's center is [-1+2/wt/2, ht/wt-2/wt/2] = [-1+1/wt, ht/wt-1/wt]
-// To advance screen x or screen y by one pixel, we add 2/wt. To decrease screen
-// y by one pixel, we subtract 2/wt. With thipls, we can zig zag across the
+// Accordingly, the top left pixel has bounds {[-1,-1+2/wt],[ht/wt-2/wt,
+// ht/wt]}. It's center is [-1+2/wt/2, ht/wt-2/wt/2] = [-1+1/wt, ht/wt-1/wt] To
+// advance screen x or screen y by one pixel, we add 2/wt. To decrease screen y
+// by one pixel, we subtract 2/wt. With thipls, we can zig zag across the
 // screen, linearly interpolating along the way.
 //
 // We can plug this directly into the above formula.
 // The value of the expression at the top left pixel center is this:
 // (y0w1 - w0y1) * (-1+1/wt) + (w0x1 - x0w1) * (ht/wt-1/wt) + (x0y1 - y0x1)
 //
-// Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2 / wt
-// Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2 / wt
+// Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2 /
+// wt Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2
+// / wt
 //
 // Now, another observation: we still only care about the sign of this
 // expression, and multiplying the start and the increments by a positive
-// constant does not change the sign. Accordingly, we can multply by wt, and get:
+// constant does not change the sign. Accordingly, we can multply by wt, and
+// get:
 //
-// Top left: (y0w1 - w0y1) * (1-wt) + (w0x1 - x0w1) * (ht-1) + (x0y1 - y0x1) * wt
-// Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2
+// Top left: (y0w1 - w0y1) * (1-wt) + (w0x1 - x0w1) * (ht-1) + (x0y1 - y0x1) *
+// wt Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2
 // Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2
 //
 // We can give the coefficients names:
@@ -162,8 +163,9 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 // We can divide this by (y_top - y_bot) without changing the sign:
 // Left = w_x_min * x - x_min
 // a = w_x_min, b = 0, c = -x_min
-// Then, it's just a matter of checking whether a point along the right end is
-// negative, and multiplying the coefficients by -1 if so.
+// Left should increase as x increases, so we multiply the coefficients by -1
+// iff w_x_min is negative.
+// Working out the maintenance equations gives:
 // This gives:
 // Top left: w_x_min*(1-wt) - x_min*wt
 // dX: w_x_min*2
@@ -171,3 +173,10 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 
 // WIP: Let's actually try left in practice and see if it works correctly before
 // doing the others.
+
+int16_t left_begin(int16_t x, int16_t w) {
+  int16_t val = x * screen_width - w * (1 - screen_width);
+  return w < 0 ? -val : val;
+}
+
+int16_t left_dx(int16_t w) { return w < 0 ? -w * 2 : w * 2; }
