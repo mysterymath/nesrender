@@ -53,20 +53,49 @@ static void move_to(uint16_t x, uint16_t y) {
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
 }
 
+int32_t left_begin(int16_t x, int16_t w);
+int32_t left_dx(int16_t w);
+int32_t right_begin(int16_t x, int16_t w);
+int32_t right_dx(int16_t w);
+
 static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
 
-  int16_t cc_to_x, cc_to_w;
-  xy_to_cc(x, y, &cc_to_x, &cc_to_w);
-  int16_t cc_to_y_top, cc_to_y_bot;
-  z_to_cc(wall_top_z, &cc_to_y_top);
-  z_to_cc(wall_bot_z, &cc_to_y_bot);
-  DEBUG_CC("Draw to", cc_to);
+  int16_t cc_x, cc_w;
+  xy_to_cc(x, y, &cc_x, &cc_w);
+  int16_t cc_y_top, cc_y_bot;
+  z_to_cc(wall_top_z, &cc_y_top);
+  z_to_cc(wall_bot_z, &cc_y_bot);
+  DEBUG_CC("Draw to", cc);
 
-  cur_cc_x = cc_to_x;
-  cur_cc_y_top = cc_to_y_top;
-  cur_cc_y_bot = cc_to_y_bot;
-  cur_cc_w = cc_to_w;
+  int32_t left = left_begin(cur_cc_x, cur_cc_w);
+  int32_t right = right_begin(cc_x, cc_w);
+  int32_t ldx = left_dx(cur_cc_w);
+  int32_t rdx = right_dx(cc_w);
+  uint8_t *fb_col = fb_next;
+  for (uint8_t sx = 0; sx < screen_width; ++sx, left += ldx, right += rdx,
+               fb_col = (sx & 1) ? fb_col + 30 : fb_col) {
+    if (left < 0)
+      continue;
+    if (right <= 0)
+      break;
+    if (sx & 1) {
+      for (uint8_t y = 0; y < 30; y++) {
+        fb_col[y] &= 0b00001111;
+        fb_col[y] |= 0b01010000;
+      }
+    } else {
+      for (uint8_t y = 0; y < 30; y++) {
+        fb_col[y] &= 0b11110000;
+        fb_col[y] |= 0b00000101;
+      }
+    }
+  }
+
+  cur_cc_x = cc_x;
+  cur_cc_y_top = cc_y_top;
+  cur_cc_y_bot = cc_y_bot;
+  cur_cc_w = cc_w;
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
@@ -118,6 +147,10 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 //
 // Let's arbitrarily take w to be 1; the expression then becomes:
 // (y0w1 - w0y1) * x + (w0x1 - x0w1) * y + (x0y1 - y0x1)
+// We can give these coefficients names:
+// a = y0w1 - w0y1
+// b = w0x1 - x0w1
+// c = x0y1 - y0x1
 //
 // If w=1, then the screen frustum bounds are {[-1,1],[-ht/wt, ht/wt]}.  This is
 // divided evenly into w columns and h rows, each 2/wt in width and 2/wt in
@@ -125,58 +158,44 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 //
 // Accordingly, the top left pixel has bounds {[-1,-1+2/wt],[ht/wt-2/wt,
 // ht/wt]}. It's center is [-1+2/wt/2, ht/wt-2/wt/2] = [-1+1/wt, ht/wt-1/wt] To
-// advance screen x or screen y by one pixel, we add 2/wt. To decrease screen y
-// by one pixel, we subtract 2/wt. With thipls, we can zig zag across the
-// screen, linearly interpolating along the way.
+// advance screen x or y by one pixel, we add a (2/wt).
 //
-// We can plug this directly into the above formula.
-// The value of the expression at the top left pixel center is this:
-// (y0w1 - w0y1) * (-1+1/wt) + (w0x1 - x0w1) * (ht/wt-1/wt) + (x0y1 - y0x1)
-//
-// Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2 /
-// wt Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2
-// / wt
+// Plugging in the top left pixel gives:
+// a * (-1+1/wt) + b * (ht/wt-1/wt) + c
 //
 // Now, another observation: we still only care about the sign of this
 // expression, and multiplying the start and the increments by a positive
 // constant does not change the sign. Accordingly, we can multply by wt, and
 // get:
 //
-// Top left: (y0w1 - w0y1) * (1-wt) + (w0x1 - x0w1) * (ht-1) + (x0y1 - y0x1) *
-// wt Incremeting X by one pixel adds:                        (y0w1 - w0y1) * 2
-// Incremeting/decrementing Y by one pixel adds/subtracts: (w0x1 - x0w1) * 2
-//
-// We can give the coefficients names:
-// a = y0w1 - w0y1
-// b = w0x1 - x0w1
-// c = x0y1 - y0x1
-// Top left: a*(1-wt) + b*(ht-1) + c*wt
-// dX: a*2
-// dY: b*2
+// Top left: a * (1-wt) + b * (ht-1) + c * wt.
+// Simplifying gives: a - a*wt + b*ht - b + c * wt
+// Simplifying gives: a + (c - a)*wt + b*ht - b
+// dX = 2 * a, dY = 2 * b
 //
 // Finally, we can compute the coefficients for each quad edge:
 // Left: (x_min,y_top,w_x_min) to (x_min, y_bot, w_x_min)
 // a = y_top*w_x_min - w_x_min*y_bot = w_x_min * (y_top - y_bot)
 // b = w_x_min*x_min - w_x_min * x_min = 0
 // c = x_min*y_bot - y_top*x_min = x_min * (y_bot - y_top)
-// Left = w_x_min * (y_top - y_bot) * x - x_min * (y_top - y_bot)
 // We can divide this by (y_top - y_bot) without changing the sign:
-// Left = w_x_min * x - x_min
-// a = w_x_min, b = 0, c = -x_min
+// a = w_x_min
+// c = -x_min
 // Left should increase as x increases, so we multiply the coefficients by -1
 // iff w_x_min is negative.
-// Working out the maintenance equations gives:
-// This gives:
-// Top left: w_x_min*(1-wt) - x_min*wt
-// dX: w_x_min*2
-// dY: 0
+//
+// We also have that right is the same as left, just with the sign flipped, and
+// using w_x_max and x_max.
 
 // WIP: Let's actually try left in practice and see if it works correctly before
 // doing the others.
 
-int16_t left_begin(int16_t x, int16_t w) {
-  int16_t val = x * screen_width - w * (1 - screen_width);
+int32_t left_begin(int16_t x, int16_t w) {
+  int32_t val = w - (x + w) * screen_width;
   return w < 0 ? -val : val;
 }
 
-int16_t left_dx(int16_t w) { return w < 0 ? -w * 2 : w * 2; }
+int32_t left_dx(int16_t w) { return w < 0 ? -w * 2 : w * 2; }
+
+int32_t right_begin(int16_t x, int16_t w) { return -left_begin(x, w); }
+int32_t right_dx(int16_t w) { return -left_dx(w); }
