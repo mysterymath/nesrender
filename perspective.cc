@@ -86,8 +86,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
   int32_t top, tdx, tdy, tnc;
   top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
+  top += tdx * sx;
+
   int32_t bot, bdx, bdy, bnc;
   bot_edge(cc_x, cc_y_bot, cc_w, &bot, &bdx, &bdy, &bnc);
+  bot += tdx * sx;
+
   DEBUG("ldx: %ld, rdx: %ld\n", ldx, rdx);
   DEBUG("tdx: %ld, tdy: %ld, tnc: %ld\n", tdx, tdy, tnc);
   DEBUG("bdx: %ld, bdy: %ld, bnc: %ld\n", bdx, bdy, bnc);
@@ -222,11 +226,6 @@ void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
   int32_t a = (int32_t)cur_cc_y_top * w - (int32_t)cur_cc_w * y_top;
   int32_t b = (int32_t)cur_cc_w * x - (int32_t)cur_cc_x * w;
   int32_t c = (int32_t)cur_cc_x * y_top - (int32_t)cur_cc_y_top * x;
-  if (b < 0) {
-    a = -a;
-    b = -b;
-    c = -c;
-  }
   *begin = edge_begin(a, b, c);
   *dx = 2 * a;
   *dy = 2 * b;
@@ -235,14 +234,9 @@ void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
 
 void bot_edge(int16_t x, int16_t y_bot, int16_t w, int32_t *begin, int32_t *dx,
               int32_t *dy, int32_t *nextcol) {
-  int32_t a = (int32_t)cur_cc_y_bot * w - (int32_t)cur_cc_w * y_bot;
-  int32_t b = (int32_t)cur_cc_w * x - (int32_t)cur_cc_x * w;
-  int32_t c = (int32_t)cur_cc_x * y_bot - (int32_t)cur_cc_y_bot * x;
-  if (b > 0) {
-    a = -a;
-    b = -b;
-    c = -c;
-  }
+  int32_t a = (int32_t)cur_cc_w * y_bot - (int32_t)cur_cc_y_bot * w;
+  int32_t b = (int32_t)cur_cc_x * w - (int32_t)cur_cc_w * x;
+  int32_t c = (int32_t)cur_cc_y_bot * x - (int32_t)cur_cc_x * y_bot;
   *begin = edge_begin(a, b, c);
   *dx = 2 * a;
   *dy = 2 * b;
