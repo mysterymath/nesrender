@@ -61,7 +61,7 @@ void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
 void bot_edge(int16_t x, int16_t y_bot, int16_t w, int32_t *begin, int32_t *dx,
               int32_t *dy, int32_t *nextcol);
 
-static void draw_to(uint16_t x, uint16_t y) {
+__attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
 
   int16_t cc_x, cc_w;
@@ -73,8 +73,17 @@ static void draw_to(uint16_t x, uint16_t y) {
 
   int32_t left, ldx;
   left_edge(&left, &ldx);
+
+  uint8_t sx;
+  uint8_t *fb_col = fb_next;
+  for (sx = 0; sx < screen_width && left < 0;
+       left += ldx, fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx)
+    ;
+
   int32_t right, rdx;
   right_edge(cc_x, cc_w, &right, &rdx);
+  right += rdx * sx;
+
   int32_t top, tdx, tdy, tnc;
   top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
   int32_t bot, bdx, bdy, bnc;
@@ -82,16 +91,9 @@ static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("ldx: %ld, rdx: %ld\n", ldx, rdx);
   DEBUG("tdx: %ld, tdy: %ld, tnc: %ld\n", tdx, tdy, tnc);
   DEBUG("bdx: %ld, bdy: %ld, bnc: %ld\n", bdx, bdy, bnc);
-  uint8_t *fb_col = fb_next;
-  for (uint8_t sx = 0; sx < screen_width; left += ldx, right += rdx,
-               fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
-    DEBUG("sx: %u, left: %ld, right: %ld, top: %ld, bot: %ld\n", sx, left,
-          right, top, bot);
-    if (left < 0) {
-      top += tdx;
-      bot += bdx;
-      continue;
-    }
+  for (; sx < screen_width;
+       right += rdx, fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
+    DEBUG("sx: %u, right: %ld, top: %ld, bot: %ld\n", sx, right, top, bot);
     if (right <= 0)
       break;
     for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy, bot += bdy) {
