@@ -66,19 +66,26 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
   int16_t cc_x, cc_w;
   xy_to_cc(x, y, &cc_x, &cc_w);
+
   int16_t cc_y_top, cc_y_bot;
   z_to_cc(wall_top_z, &cc_y_top);
   z_to_cc(wall_bot_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
+
+  // There is homogeneous weirdness when both w are zero. Disallow.
+  if (cc_w < 0 && cur_cc_w < 0)
+    return;
 
   int32_t left, ldx;
   left_edge(&left, &ldx);
 
   uint8_t sx;
   uint8_t *fb_col = fb_next;
-  for (sx = 0; sx < screen_width && left < 0;
-       left += ldx, fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx)
-    ;
+  for (sx = 0; left < 0;
+       left += ldx, fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
+    if (sx == screen_width)
+      return;
+  }
 
   int32_t right, rdx;
   right_edge(cc_x, cc_w, &right, &rdx);
