@@ -37,7 +37,7 @@ static bool line_visible(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
                          int16_t vc_y2);
 static void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x,
                  int16_t *clip_vc_y);
-static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
+static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *nsx, uint16_t *sy);
 
 static int16_t cur_vc_x;
 static int16_t cur_vc_y;

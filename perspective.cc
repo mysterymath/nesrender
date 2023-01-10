@@ -11,7 +11,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-// #define DEBUG_FILE
+//#define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -51,12 +51,13 @@ static void move_to(uint16_t x, uint16_t y) {
   xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
   z_to_cc(wall_top_z, &cur_cc_y_top);
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
+  DEBUG_CC("Moved to CC:", cur_cc);
 }
 
-int32_t left_begin(int16_t x, int16_t w);
-int32_t left_dx(int16_t w);
-int32_t right_begin(int16_t x, int16_t w);
-int32_t right_dx(int16_t w);
+void left_edge(int32_t *begin, int32_t *delta);
+void right_edge(int16_t x, int16_t w, int32_t *begin, int32_t *delta);
+void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
+              int32_t *dy, int32_t *nextcol);
 
 static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
@@ -68,28 +69,44 @@ static void draw_to(uint16_t x, uint16_t y) {
   z_to_cc(wall_bot_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
 
-  int32_t left = left_begin(cur_cc_x, cur_cc_w);
-  int32_t right = right_begin(cc_x, cc_w);
-  int32_t ldx = left_dx(cur_cc_w);
-  int32_t rdx = right_dx(cc_w);
+  int32_t left, ldx;
+  left_edge(&left, &ldx);
+  int32_t right, rdx;
+  right_edge(cc_x, cc_w, &right, &rdx);
+  int32_t top, tdx, tdy, tnc;
+  top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
+  DEBUG("ldx: %ld, rdx: %ld, tdx: %ld, tdy: %ld, tnc: %ld\n", ldx, rdx, tdx,
+        tdy, tnc);
   uint8_t *fb_col = fb_next;
   for (uint8_t sx = 0; sx < screen_width; ++sx, left += ldx, right += rdx,
                fb_col = (sx & 1) ? fb_col + 30 : fb_col) {
-    if (left < 0)
+    DEBUG("sx: %u, left: %ld, right: %ld, top: %ld\n", sx, left, right, top);
+    if (left < 0) {
+      top += tdx;
       continue;
+    }
     if (right <= 0)
       break;
-    if (sx & 1) {
-      for (uint8_t y = 0; y < 30; y++) {
-        fb_col[y] &= 0b00001111;
-        fb_col[y] |= 0b01010000;
-      }
-    } else {
-      for (uint8_t y = 0; y < 30; y++) {
-        fb_col[y] &= 0b11110000;
-        fb_col[y] |= 0b00000101;
+    for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy) {
+      if (sx & 1 && sy & 1) {
+        fb_col[sy / 2] &= 0b11110011;
+        if (top >= 0)
+          fb_col[sy / 2] |= 0b00000100;
+      } else if (sx & 1) {
+        fb_col[sy / 2] &= 0b11111100;
+        if (top >= 0)
+          fb_col[sy / 2] |= 0b00000001;
+      } else if (sy & 1) {
+        fb_col[sy / 2] &= 0b00111111;
+        if (top >= 0)
+          fb_col[sy / 2] |= 0b01000000;
+      } else {
+        fb_col[sy / 2] &= 0b11001111;
+        if (top >= 0)
+          fb_col[sy / 2] |= 0b00010000;
       }
     }
+    top += tnc;
   }
 
   cur_cc_x = cc_x;
@@ -169,14 +186,14 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 // get:
 //
 // Top left: a * (1-wt) + b * (ht-1) + c * wt.
-// Simplifying gives: a - a*wt + b*ht - b + c * wt
-// Simplifying gives: a + (c - a)*wt + b*ht - b
+// Simplifying gives: a - a*wt + b*(ht-1) + c * wt
+// Simplifying gives: a + (c - a)*wt + b*(ht-1)
 // dX = 2 * a, dY = 2 * b
 //
 // Finally, we can compute the coefficients for each quad edge:
 // Left: (x_min,y_top,w_x_min) to (x_min, y_bot, w_x_min)
 // a = y_top*w_x_min - w_x_min*y_bot = w_x_min * (y_top - y_bot)
-// b = w_x_min*x_min - w_x_min * x_min = 0
+// b = w_x_min*x_min - w_x_min*x_min = 0
 // c = x_min*y_bot - y_top*x_min = x_min * (y_bot - y_top)
 // We can divide this by (y_top - y_bot) without changing the sign:
 // a = w_x_min
@@ -187,15 +204,45 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 // We also have that right is the same as left, just with the sign flipped, and
 // using w_x_max and x_max.
 
-// WIP: Let's actually try left in practice and see if it works correctly before
-// doing the others.
-
-int32_t left_begin(int16_t x, int16_t w) {
-  int32_t val = w - (x + w) * screen_width;
-  return w < 0 ? -val : val;
+int32_t edge_begin(int32_t a, int32_t b, int32_t c) {
+  return a + (c - a) * screen_width + b * (screen_height - 1);
 }
 
-int32_t left_dx(int16_t w) { return w < 0 ? -w * 2 : w * 2; }
+void left_edge(int32_t *begin, int32_t *delta) {
+  int32_t a = cur_cc_w;
+  int32_t c = -cur_cc_x;
+  if (a < 0) {
+    a = -a;
+    c = -c;
+  }
+  *begin = edge_begin(a, 0, c);
+  *delta = 2 * a;
+}
 
-int32_t right_begin(int16_t x, int16_t w) { return -left_begin(x, w); }
-int32_t right_dx(int16_t w) { return -left_dx(w); }
+void right_edge(int16_t x, int16_t w, int32_t *begin, int32_t *delta) {
+  int32_t a = -w;
+  int32_t c = x;
+  if (a > 0) {
+    a = -a;
+    c = -c;
+  }
+  *begin = edge_begin(a, 0, c);
+  *delta = 2 * a;
+}
+
+void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
+              int32_t *dy, int32_t *nextcol) {
+  int32_t a = (int32_t)cur_cc_y_top * w - (int32_t)cur_cc_w * y_top;
+  int32_t b = (int32_t)cur_cc_w * x - (int32_t)cur_cc_x * w;
+  int32_t c = (int32_t)cur_cc_x * y_top - (int32_t)cur_cc_y_top * x;
+  // Increasing y is moving up the screen, so this should decrease top.
+  if (b > 0) {
+    a = -a;
+    b = -b;
+    c = -c;
+  }
+  *begin = edge_begin(a, b, c);
+  *dx = 2 * a;
+  *dy = -2 * b;
+  *nextcol = *dx - screen_height * *dy;
+}
