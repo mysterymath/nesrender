@@ -206,10 +206,6 @@ int32_t edge_begin(int32_t a, int32_t b, int32_t c) {
 void left_edge(int32_t *begin, int32_t *delta) {
   int32_t a = cur_cc_w;
   int32_t c = -cur_cc_x;
-  if (a < 0) {
-    a = -a;
-    c = -c;
-  }
   *begin = edge_begin(a, 0, c);
   *delta = 2 * a;
 }
@@ -217,10 +213,6 @@ void left_edge(int32_t *begin, int32_t *delta) {
 void right_edge(int16_t x, int16_t w, int32_t *begin, int32_t *delta) {
   int32_t a = -w;
   int32_t c = x;
-  if (a > 0) {
-    a = -a;
-    c = -c;
-  }
   *begin = edge_begin(a, 0, c);
   *delta = 2 * a;
 }
