@@ -11,7 +11,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-//#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -58,6 +58,8 @@ void left_edge(int32_t *begin, int32_t *delta);
 void right_edge(int16_t x, int16_t w, int32_t *begin, int32_t *delta);
 void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
               int32_t *dy, int32_t *nextcol);
+void bot_edge(int16_t x, int16_t y_bot, int16_t w, int32_t *begin, int32_t *dx,
+              int32_t *dy, int32_t *nextcol);
 
 static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
@@ -75,38 +77,44 @@ static void draw_to(uint16_t x, uint16_t y) {
   right_edge(cc_x, cc_w, &right, &rdx);
   int32_t top, tdx, tdy, tnc;
   top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
-  DEBUG("ldx: %ld, rdx: %ld, tdx: %ld, tdy: %ld, tnc: %ld\n", ldx, rdx, tdx,
-        tdy, tnc);
+  int32_t bot, bdx, bdy, bnc;
+  bot_edge(cc_x, cc_y_bot, cc_w, &bot, &bdx, &bdy, &bnc);
+  DEBUG("ldx: %ld, rdx: %ld\n", ldx, rdx);
+  DEBUG("tdx: %ld, tdy: %ld, tnc: %ld\n", tdx, tdy, tnc);
+  DEBUG("bdx: %ld, bdy: %ld, bnc: %ld\n", bdx, bdy, bnc);
   uint8_t *fb_col = fb_next;
-  for (uint8_t sx = 0; sx < screen_width; ++sx, left += ldx, right += rdx,
-               fb_col = (sx & 1) ? fb_col + 30 : fb_col) {
-    DEBUG("sx: %u, left: %ld, right: %ld, top: %ld\n", sx, left, right, top);
+  for (uint8_t sx = 0; sx < screen_width; left += ldx, right += rdx,
+               fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
+    DEBUG("sx: %u, left: %ld, right: %ld, top: %ld, bot: %ld\n", sx, left,
+          right, top, bot);
     if (left < 0) {
       top += tdx;
+      bot += bdx;
       continue;
     }
     if (right <= 0)
       break;
-    for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy) {
+    for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy, bot += bdy) {
       if (sx & 1 && sy & 1) {
-        fb_col[sy / 2] &= 0b11110011;
-        if (top >= 0)
-          fb_col[sy / 2] |= 0b00000100;
-      } else if (sx & 1) {
-        fb_col[sy / 2] &= 0b11111100;
-        if (top >= 0)
-          fb_col[sy / 2] |= 0b00000001;
-      } else if (sy & 1) {
         fb_col[sy / 2] &= 0b00111111;
-        if (top >= 0)
+        if (top >= 0 && bot > 0)
           fb_col[sy / 2] |= 0b01000000;
-      } else {
+      } else if (sx & 1) {
         fb_col[sy / 2] &= 0b11001111;
-        if (top >= 0)
+        if (top >= 0 && bot > 0)
           fb_col[sy / 2] |= 0b00010000;
+      } else if (sy & 1) {
+        fb_col[sy / 2] &= 0b11110011;
+        if (top >= 0 && bot > 0)
+          fb_col[sy / 2] |= 0b00000100;
+      } else {
+        fb_col[sy / 2] &= 0b11111100;
+        if (top >= 0 && bot > 0)
+          fb_col[sy / 2] |= 0b00000001;
       }
     }
     top += tnc;
+    bot += bnc;
   }
 
   cur_cc_x = cc_x;
@@ -124,7 +132,7 @@ static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
   *cc_w = vx;
 }
 
-static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
+static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = player.z - z; }
 
 // The following is an interpretation of Olano and Greer's homogenous
 // rasterization for wall quads.
@@ -173,39 +181,24 @@ static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = z - player.z; }
 // divided evenly into w columns and h rows, each 2/wt in width and 2/wt in
 // height (let's not do rectangular pixels for now).
 //
-// Accordingly, the top left pixel has bounds {[-1,-1+2/wt],[ht/wt-2/wt,
-// ht/wt]}. It's center is [-1+2/wt/2, ht/wt-2/wt/2] = [-1+1/wt, ht/wt-1/wt] To
-// advance screen x or y by one pixel, we add a (2/wt).
+// Accordingly, the top left pixel has center [-1+2/wt/2, -ht/wt+2/wt/2] =
+// [-1+1/wt, -ht/wt+1/wt]. To advance screen x or y by one pixel, we add 2/wt.
 //
 // Plugging in the top left pixel gives:
-// a * (-1+1/wt) + b * (ht/wt-1/wt) + c
+// a * (-1+1/wt) + b * (-ht/wt+1/wt) + c
 //
 // Now, another observation: we still only care about the sign of this
 // expression, and multiplying the start and the increments by a positive
 // constant does not change the sign. Accordingly, we can multply by wt, and
 // get:
 //
-// Top left: a * (1-wt) + b * (ht-1) + c * wt.
-// Simplifying gives: a - a*wt + b*(ht-1) + c * wt
-// Simplifying gives: a + (c - a)*wt + b*(ht-1)
-// dX = 2 * a, dY = 2 * b
-//
-// Finally, we can compute the coefficients for each quad edge:
-// Left: (x_min,y_top,w_x_min) to (x_min, y_bot, w_x_min)
-// a = y_top*w_x_min - w_x_min*y_bot = w_x_min * (y_top - y_bot)
-// b = w_x_min*x_min - w_x_min*x_min = 0
-// c = x_min*y_bot - y_top*x_min = x_min * (y_bot - y_top)
-// We can divide this by (y_top - y_bot) without changing the sign:
-// a = w_x_min
-// c = -x_min
-// Left should increase as x increases, so we multiply the coefficients by -1
-// iff w_x_min is negative.
-//
-// We also have that right is the same as left, just with the sign flipped, and
-// using w_x_max and x_max.
+// Top left: a * (1-wt) + b * (1-ht) + c * wt
+// = a - a*wt + b*(1-ht) + c * wt
+// = a + (c - a)*wt + b*(1-ht)
+// dX = 2a, dY = 2b
 
 int32_t edge_begin(int32_t a, int32_t b, int32_t c) {
-  return a + (c - a) * screen_width + b * (screen_height - 1);
+  return a + (c - a) * (int32_t)screen_width + b * (1 - (int32_t)screen_height);
 }
 
 void left_edge(int32_t *begin, int32_t *delta) {
@@ -235,7 +228,22 @@ void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
   int32_t a = (int32_t)cur_cc_y_top * w - (int32_t)cur_cc_w * y_top;
   int32_t b = (int32_t)cur_cc_w * x - (int32_t)cur_cc_x * w;
   int32_t c = (int32_t)cur_cc_x * y_top - (int32_t)cur_cc_y_top * x;
-  // Increasing y is moving up the screen, so this should decrease top.
+  if (b < 0) {
+    a = -a;
+    b = -b;
+    c = -c;
+  }
+  *begin = edge_begin(a, b, c);
+  *dx = 2 * a;
+  *dy = 2 * b;
+  *nextcol = *dx - screen_height * *dy;
+}
+
+void bot_edge(int16_t x, int16_t y_bot, int16_t w, int32_t *begin, int32_t *dx,
+              int32_t *dy, int32_t *nextcol) {
+  int32_t a = (int32_t)cur_cc_y_bot * w - (int32_t)cur_cc_w * y_bot;
+  int32_t b = (int32_t)cur_cc_w * x - (int32_t)cur_cc_x * w;
+  int32_t c = (int32_t)cur_cc_x * y_bot - (int32_t)cur_cc_y_bot * x;
   if (b > 0) {
     a = -a;
     b = -b;
@@ -243,6 +251,6 @@ void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
   }
   *begin = edge_begin(a, b, c);
   *dx = 2 * a;
-  *dy = -2 * b;
+  *dy = 2 * b;
   *nextcol = *dx - screen_height * *dy;
 }
