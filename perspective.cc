@@ -72,63 +72,126 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   z_to_cc(wall_bot_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
 
+  int16_t orig_cc_x = cc_x;
+  int16_t orig_cc_y_top = cc_y_top;
+  int16_t orig_cc_y_bot = cc_y_bot;
+  int16_t orig_cc_w = cc_w;
+
   // There is homogeneous weirdness when both w are zero. Disallow.
-  if (cc_w < 0 && cur_cc_w < 0)
+  if (cc_w <= 0 && cur_cc_w <= 0)
     goto done;
 
   {
-    int32_t left, ldx;
-    left_edge(&left, &ldx);
-    int32_t right, rdx;
-    right_edge(cc_x, cc_w, &right, &rdx);
-    int32_t top, tdx, tdy, tnc;
-    top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
-    int32_t bot, bdx, bdy, bnc;
-    bot_edge(cc_x, cc_y_bot, cc_w, &bot, &bdx, &bdy, &bnc);
+    bool cur_left = cur_cc_x < -cur_cc_w;
+    bool left = cc_x < -cc_w;
+    bool cur_right = cur_cc_x > cur_cc_w;
+    bool right = cc_x > cc_w;
+    bool cur_bot_above_top =
+        cur_cc_y_bot * screen_width < -cur_cc_w * screen_height;
+    bool bot_above_top = cc_y_bot * screen_width < -cc_w * screen_height;
+    bool cur_top_below_bot =
+        cur_cc_y_top * screen_width > cur_cc_w * screen_height;
+    bool top_below_bot = cc_y_top * screen_width > cc_w * screen_height;
 
-    DEBUG("ldx: %ld, rdx: %ld\n", ldx, rdx);
-    DEBUG("tdx: %ld, tdy: %ld, tnc: %ld\n", tdx, tdy, tnc);
-    DEBUG("bdx: %ld, bdy: %ld, bnc: %ld\n", bdx, bdy, bnc);
-    uint8_t *fb_col = fb_next;
-    for (uint8_t sx = 0; sx < screen_width; left += ldx, right += rdx,
-                 fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
-      DEBUG("sx: %u, right: %ld, top: %ld, bot: %ld\n", sx, right, top, bot);
-      if (left < 0) {
-        top += tdx;
-        bot += bdx;
-        continue;
-      }
-      if (right <= 0)
-        break;
-      for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy, bot += bdy) {
-        if (sx & 1 && sy & 1) {
-          fb_col[sy / 2] &= 0b00111111;
-          if (top >= 0 && bot > 0)
-            fb_col[sy / 2] |= 0b01000000;
-        } else if (sx & 1) {
-          fb_col[sy / 2] &= 0b11001111;
-          if (top >= 0 && bot > 0)
-            fb_col[sy / 2] |= 0b00010000;
-        } else if (sy & 1) {
-          fb_col[sy / 2] &= 0b11110011;
-          if (top >= 0 && bot > 0)
-            fb_col[sy / 2] |= 0b00000100;
-        } else {
-          fb_col[sy / 2] &= 0b11111100;
-          if (top >= 0 && bot > 0)
-            fb_col[sy / 2] |= 0b00000001;
-        }
-      }
-      top += tnc;
-      bot += bnc;
+    if (cur_left && left || cur_right && right ||
+        cur_bot_above_top && bot_above_top ||
+        cur_top_below_bot && top_below_bot) {
+      DEBUG("Frustum cull.\n");
+      goto done;
+    }
+
+    // Use cross product to backface cull.
+    if (cur_cc_x * cc_w >= cur_cc_w * cc_x) {
+      DEBUG("Backface cull.\n");
+      goto done;
+    }
+
+    int16_t dx = cc_x - cur_cc_x;
+    int16_t dy_top = cc_y_top - cur_cc_y_top;
+    int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
+    int16_t dw = cc_w - cur_cc_w;
+
+    int16_t m_top, m_bot;
+    if (cur_left) {
+      DEBUG("Wall crosses left frustum edge. Clipping.\n");
+      DEBUG_CC("Cur", cur_cc);
+      DEBUG_CC("Next", cc);
+      // r(t) = cur + vt
+      // w(t)_x = -w(t)_w
+      // cur_x + dxt = -cur_w - dw*t;
+      // t*(dx + dw) = -cur_w - cur_x
+      // t = (-cur_w - cur_x) / (dx + dw)
+      // Since the wall cannot be parallel to the left frustum edge, dw + dx !=
+      // 0.
+      int16_t t_num = -cur_cc_w - cur_cc_x;
+      int16_t t_denom = dx + dw;
+      cur_cc_x += (int32_t)dx * t_num / t_denom;
+      cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
+      cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
+      cur_cc_w = -cur_cc_x;
+      DEBUG_CC("Clipped Cur", cur_cc);
+    }
+    if (right) {
+      DEBUG("Wall crosses right frustum edge. Clipping.\n");
+      DEBUG_CC("Cur", cur_cc);
+      DEBUG_CC("Next", cc);
+      int16_t t_num = cc_w - cc_x;
+      int16_t t_denom = dx - dw;
+      cc_x += (int32_t)dx * t_num / t_denom;
+      cc_y_top += (int32_t)dy_top * t_num / t_denom;
+      cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
+      cc_w = cc_x;
+      DEBUG_CC("Clipped Next", cc);
+    }
+
+    bool cur_top_above_top =
+        cur_cc_y_top * screen_width < -cur_cc_w * screen_height;
+    bool top_above_top = cc_y_top * screen_width < -cc_w * screen_height;
+    bool cur_bot_below_bot =
+        cur_cc_y_bot * screen_width > cur_cc_w * screen_height;
+    bool bot_below_bot = cc_y_bot * screen_width > cc_w * screen_height;
+    if (cur_top_above_top && top_above_top) {
+      cur_cc_y_top = -cur_cc_w * screen_height / screen_width;
+      cc_y_top = -cc_w * screen_height / screen_width;
+      cur_top_above_top = top_above_top = false;
+    }
+    if (cur_bot_below_bot && bot_below_bot) {
+      cur_cc_y_bot = cur_cc_w * screen_height / screen_width;
+      cc_y_bot = cc_w * screen_height / screen_width;
+      cur_bot_below_bot = bot_below_bot = false;
+    }
+
+    // Compute slopes for top and bottom.
+    // m = (y/w - cur_y/cur_w) / (x/w - cur_x/cur_w)
+    // m = (y*cur_w - cur_y*w) / (x*cur_w - cur_x*w)
+    int32_t m_denom = ((int32_t)cc_x * cur_cc_w - (int32_t)cur_cc_x * cc_w;
+    int16_t m_top =
+        ((int32_t)cc_y_top * cur_cc_w - (int32_t)cur_cc_y_top * cc_w) * 256 /
+        m_denom;
+    int16_t m_bot =
+        ((int32_t)cc_y_bot * cur_cc_w - (int32_t)cur_cc_y_bot * cc_w) * 256 /
+        denom;
+
+    // Do a left-to-right pass scan.
+    uint8_t sy_top[64];
+    uint8_t sy_bot[64];
+    int16_t sx = (int32_t)cur_cc_x * screen_width * 256 / cur_cc_w;
+    int16_t sy_top, sy_bot;
+    bool cur_top_on_screen = !cur_top_above_top && !cur_top_below_bot;
+    bool cur_bot_on_screen = !cur_bot_above_top && !cur_bot_below_bot;
+    if (cur_top_on_screen || cur_bot_on_screen) {
+      if (cur_top_on_screen)
+        sy_top = (int32_t)cur_cc_y_top * screen_width * 256 / cur_cc_w;
+      if (cur_bot_on_screen)
+        sy_bot = (int32_t)cur_cc_y_bot * screen_width * 256 / cur_cc_w;
     }
   }
 
 done:
-  cur_cc_x = cc_x;
-  cur_cc_y_top = cc_y_top;
-  cur_cc_y_bot = cc_y_bot;
-  cur_cc_w = cc_w;
+  cur_cc_x = orig_cc_x;
+  cur_cc_y_top = orig_cc_y_top;
+  cur_cc_y_bot = orig_cc_y_bot;
+  cur_cc_w = orig_cc_w;
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
