@@ -61,6 +61,9 @@ void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
 void bot_edge(int16_t x, int16_t y_bot, int16_t w, int32_t *begin, int32_t *dx,
               int32_t *dy, int32_t *nextcol);
 
+template <bool x_odd>
+void draw_column(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot);
+
 __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
 
@@ -230,6 +233,20 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       pix_y_tops[sx / 256] = top_pix;
       pix_y_bots[sx / 256] = bot_pix;
     }
+
+    uint8_t *fb_col = &fb_next[pix_x_begin / 2 * 30];
+    for (uint8_t pix_x = pix_x_begin; pix_x < pix_x_end; ++pix_x) {
+      if (pix_x & 1) {
+        draw_column<true>(0, fb_col, 0, pix_y_tops[pix_x]);
+        draw_column<true>(1, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
+        draw_column<true>(0, fb_col, pix_y_bots[pix_x], screen_height);
+        fb_col += 30;
+      } else {
+        draw_column<false>(0, fb_col, 0, pix_y_tops[pix_x]);
+        draw_column<false>(1, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
+        draw_column<false>(0, fb_col, pix_y_bots[pix_x], screen_height);
+      }
+    }
   }
 
 done:
@@ -237,6 +254,44 @@ done:
   cur_cc_y_top = orig_cc_y_top;
   cur_cc_y_bot = orig_cc_y_bot;
   cur_cc_w = orig_cc_w;
+}
+
+// Note: y_bot is exclusive.
+template <bool x_odd>
+void draw_column(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot) {
+  if (y_top >= y_bot)
+    return;
+  DEBUG("%d, %d, %d\n", (col - fb_next) / 30, y_top, y_bot);
+  uint8_t i = y_top / 2;
+  if (y_top & 1) {
+    if (x_odd) {
+      col[i] &= 0b00111111;
+      col[i] |= color << 6;
+    } else {
+      col[i] &= 0b11110011;
+      col[i] |= color << 2;
+    }
+    i++;
+  }
+  while (i < y_bot / 2) {
+    if (x_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= color << 6 | color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= color << 2 | color << 0;
+    }
+    i++;
+  }
+  if (y_bot & 1) {
+    if (x_odd) {
+      col[i] &= 0b11001111;
+      col[i] |= color << 4;
+    } else {
+      col[i] &= 0b11111100;
+      col[i] |= color << 0;
+    }
+  }
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
