@@ -74,62 +74,57 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
   // There is homogeneous weirdness when both w are zero. Disallow.
   if (cc_w < 0 && cur_cc_w < 0)
-    return;
+    goto done;
 
-  int32_t left, ldx;
-  left_edge(&left, &ldx);
+  {
+    int32_t left, ldx;
+    left_edge(&left, &ldx);
+    int32_t right, rdx;
+    right_edge(cc_x, cc_w, &right, &rdx);
+    int32_t top, tdx, tdy, tnc;
+    top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
+    int32_t bot, bdx, bdy, bnc;
+    bot_edge(cc_x, cc_y_bot, cc_w, &bot, &bdx, &bdy, &bnc);
 
-  uint8_t sx;
-  uint8_t *fb_col = fb_next;
-  for (sx = 0; left < 0;
-       left += ldx, fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
-    if (sx == screen_width)
-      return;
-  }
-
-  int32_t right, rdx;
-  right_edge(cc_x, cc_w, &right, &rdx);
-  right += rdx * sx;
-
-  int32_t top, tdx, tdy, tnc;
-  top_edge(cc_x, cc_y_top, cc_w, &top, &tdx, &tdy, &tnc);
-  top += tdx * sx;
-
-  int32_t bot, bdx, bdy, bnc;
-  bot_edge(cc_x, cc_y_bot, cc_w, &bot, &bdx, &bdy, &bnc);
-  bot += tdx * sx;
-
-  DEBUG("ldx: %ld, rdx: %ld\n", ldx, rdx);
-  DEBUG("tdx: %ld, tdy: %ld, tnc: %ld\n", tdx, tdy, tnc);
-  DEBUG("bdx: %ld, bdy: %ld, bnc: %ld\n", bdx, bdy, bnc);
-  for (; sx < screen_width;
-       right += rdx, fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
-    DEBUG("sx: %u, right: %ld, top: %ld, bot: %ld\n", sx, right, top, bot);
-    if (right <= 0)
-      break;
-    for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy, bot += bdy) {
-      if (sx & 1 && sy & 1) {
-        fb_col[sy / 2] &= 0b00111111;
-        if (top >= 0 && bot > 0)
-          fb_col[sy / 2] |= 0b01000000;
-      } else if (sx & 1) {
-        fb_col[sy / 2] &= 0b11001111;
-        if (top >= 0 && bot > 0)
-          fb_col[sy / 2] |= 0b00010000;
-      } else if (sy & 1) {
-        fb_col[sy / 2] &= 0b11110011;
-        if (top >= 0 && bot > 0)
-          fb_col[sy / 2] |= 0b00000100;
-      } else {
-        fb_col[sy / 2] &= 0b11111100;
-        if (top >= 0 && bot > 0)
-          fb_col[sy / 2] |= 0b00000001;
+    DEBUG("ldx: %ld, rdx: %ld\n", ldx, rdx);
+    DEBUG("tdx: %ld, tdy: %ld, tnc: %ld\n", tdx, tdy, tnc);
+    DEBUG("bdx: %ld, bdy: %ld, bnc: %ld\n", bdx, bdy, bnc);
+    uint8_t *fb_col = fb_next;
+    for (uint8_t sx = 0; sx < screen_width; left += ldx, right += rdx,
+                 fb_col = (sx & 1) ? fb_col + 30 : fb_col, ++sx) {
+      DEBUG("sx: %u, right: %ld, top: %ld, bot: %ld\n", sx, right, top, bot);
+      if (left < 0) {
+        top += tdx;
+        bot += bdx;
+        continue;
       }
+      if (right <= 0)
+        break;
+      for (uint8_t sy = 0; sy < screen_height; sy++, top += tdy, bot += bdy) {
+        if (sx & 1 && sy & 1) {
+          fb_col[sy / 2] &= 0b00111111;
+          if (top >= 0 && bot > 0)
+            fb_col[sy / 2] |= 0b01000000;
+        } else if (sx & 1) {
+          fb_col[sy / 2] &= 0b11001111;
+          if (top >= 0 && bot > 0)
+            fb_col[sy / 2] |= 0b00010000;
+        } else if (sy & 1) {
+          fb_col[sy / 2] &= 0b11110011;
+          if (top >= 0 && bot > 0)
+            fb_col[sy / 2] |= 0b00000100;
+        } else {
+          fb_col[sy / 2] &= 0b11111100;
+          if (top >= 0 && bot > 0)
+            fb_col[sy / 2] |= 0b00000001;
+        }
+      }
+      top += tnc;
+      bot += bnc;
     }
-    top += tnc;
-    bot += bnc;
   }
 
+done:
   cur_cc_x = cc_x;
   cur_cc_y_top = cc_y_top;
   cur_cc_y_bot = cc_y_bot;
