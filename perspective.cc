@@ -82,6 +82,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     goto done;
 
   {
+#if 0
     bool cur_left = cur_cc_x < -cur_cc_w;
     bool left = cc_x < -cc_w;
     bool cur_right = cur_cc_x > cur_cc_w;
@@ -160,11 +161,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cc_y_bot = cc_w * screen_height / screen_width;
       cur_bot_below_bot = bot_below_bot = false;
     }
+#endif
 
     // Compute slopes for top and bottom.
     // m = (y/w - cur_y/cur_w) / (x/w - cur_x/cur_w)
     // m = (y*cur_w - cur_y*w) / (x*cur_w - cur_x*w)
-    int32_t m_denom = ((int32_t)cc_x * cur_cc_w - (int32_t)cur_cc_x * cc_w;
+    int32_t m_denom = (int32_t)cc_x * cur_cc_w - (int32_t)cur_cc_x * cc_w;
     int16_t m_top =
         ((int32_t)cc_y_top * cur_cc_w - (int32_t)cur_cc_y_top * cc_w) * 256 /
         m_denom;
