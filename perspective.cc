@@ -172,9 +172,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         m_denom;
     int16_t m_bot =
         ((int32_t)cc_y_bot * cur_cc_w - (int32_t)cur_cc_y_bot * cc_w) * 256 /
-        denom;
+        m_denom;
 
-    // Do a left-to-right pass scan.
+    DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
+          m_bot & 0xff);
+
+#if 0
     uint8_t sy_top[64];
     uint8_t sy_bot[64];
     int16_t sx = (int32_t)cur_cc_x * screen_width * 256 / cur_cc_w;
@@ -186,6 +189,23 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         sy_top = (int32_t)cur_cc_y_top * screen_width * 256 / cur_cc_w;
       if (cur_bot_on_screen)
         sy_bot = (int32_t)cur_cc_y_bot * screen_width * 256 / cur_cc_w;
+    }
+#endif
+
+    uint8_t sy_tops[64];
+    uint8_t sy_bots[64];
+    int16_t sx = (int32_t)cur_cc_x * screen_width / 2 * 256 / cur_cc_w;
+    int16_t sy_top = (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w;
+    int16_t sy_bot = (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w;
+
+    // Adjust to the next pixel center.
+    uint8_t offset = 128 - (uint16_t)sx % 256;
+    if (offset < 0)
+      offset += 256;
+    if (offset) {
+      sx += offset;
+      sy_top += (int32_t)m_top * offset / 256;
+      sy_bot += (int32_t)m_bot * offset / 256;
     }
   }
 
