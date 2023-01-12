@@ -110,13 +110,13 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
-#if 0
     // Use cross product to backface cull.
-    if (cur_cc_x * cc_w >= cur_cc_w * cc_x) {
+    if ((int32_t)cur_cc_x * cc_w >= (int32_t)cur_cc_w * cc_x) {
       DEBUG("Backface cull.\n");
       goto done;
     }
 
+#if 0
     int16_t dx = cc_x - cur_cc_x;
     int16_t dy_top = cc_y_top - cur_cc_y_top;
     int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
