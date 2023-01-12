@@ -38,6 +38,10 @@ static int16_t cur_cc_x;
 static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
+static bool cur_left_of_left;
+static bool cur_right_of_right;
+static bool cur_bot_above_top;
+static bool cur_top_below_bot;
 
 constexpr int16_t wall_top_z = 80;
 constexpr int16_t wall_bot_z = 20;
@@ -52,6 +56,12 @@ static void move_to(uint16_t x, uint16_t y) {
   z_to_cc(wall_top_z, &cur_cc_y_top);
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
   DEBUG_CC("Moved to CC:", cur_cc);
+  cur_left_of_left = cur_cc_x < -cur_cc_w;
+  cur_right_of_right = cur_cc_x > cur_cc_w;
+  cur_bot_above_top =
+      (int32_t)cur_cc_y_bot * screen_width < -cur_cc_w * (int32_t)screen_height;
+  cur_top_below_bot =
+      (int32_t)cur_cc_y_top * screen_width > (int32_t)cur_cc_w * screen_height;
 }
 
 void left_edge(int32_t *begin, int32_t *delta);
@@ -80,30 +90,27 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   int16_t orig_cc_y_bot = cc_y_bot;
   int16_t orig_cc_w = cc_w;
 
+  bool left_of_left = cc_x < -cc_w;
+  bool right_of_right = cc_x > cc_w;
+  bool bot_above_top =
+      (int32_t)cc_y_bot * screen_width < -cc_w * (int32_t)screen_height;
+  bool top_below_bot =
+      (int32_t)cc_y_top * screen_width > (int32_t)cc_w * screen_height;
+
   // There is homogeneous weirdness when both w are zero. Disallow.
   if (cc_w <= 0 && cur_cc_w <= 0)
     goto done;
 
   {
-#if 0
-    bool cur_left = cur_cc_x < -cur_cc_w;
-    bool left = cc_x < -cc_w;
-    bool cur_right = cur_cc_x > cur_cc_w;
-    bool right = cc_x > cc_w;
-    bool cur_bot_above_top =
-        cur_cc_y_bot * screen_width < -cur_cc_w * screen_height;
-    bool bot_above_top = cc_y_bot * screen_width < -cc_w * screen_height;
-    bool cur_top_below_bot =
-        cur_cc_y_top * screen_width > cur_cc_w * screen_height;
-    bool top_below_bot = cc_y_top * screen_width > cc_w * screen_height;
-
-    if (cur_left && left || cur_right && right ||
+    if (cur_left_of_left && left_of_left ||
+        cur_right_of_right && right_of_right ||
         cur_bot_above_top && bot_above_top ||
         cur_top_below_bot && top_below_bot) {
       DEBUG("Frustum cull.\n");
       goto done;
     }
 
+#if 0
     // Use cross product to backface cull.
     if (cur_cc_x * cc_w >= cur_cc_w * cc_x) {
       DEBUG("Backface cull.\n");
@@ -258,6 +265,10 @@ done:
   cur_cc_y_top = orig_cc_y_top;
   cur_cc_y_bot = orig_cc_y_bot;
   cur_cc_w = orig_cc_w;
+  cur_left_of_left = left_of_left;
+  cur_right_of_right = right_of_right;
+  cur_bot_above_top = bot_above_top;
+  cur_top_below_bot = top_below_bot;
 }
 
 // Note: y_bot is exclusive.
