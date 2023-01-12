@@ -195,20 +195,24 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     }
 #endif
 
+    uint16_t sx = (int32_t)cur_cc_x * screen_width / 2 * 256 / cur_cc_w +
+                  screen_width / 2 * 256;
+    uint16_t sy_top =
+        (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
+        screen_height / 2 * 256;
+    uint16_t sy_bot =
+        (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
+        screen_height / 2 * 256;
+    uint16_t sx_right =
+        (int32_t)cc_x * screen_width / 2 * 256 / cc_w + screen_width / 2 * 256;
+
+    DEBUG("sx: %u:%u, sy_top: %u:%u, sy_bot: %u:%u, sx_right: %u:%u\n", sx >> 8,
+          sx & 0xff, sy_top >> 8, sy_top & 0xff, sy_bot >> 8, sy_bot & 0xff,
+          sx_right >> 8, sy_bot & 0xff);
+
     // Top is inclusive, bot is exclusive.
     uint8_t pix_y_tops[64];
     uint8_t pix_y_bots[64];
-
-    uint16_t sx = (int32_t)cur_cc_x * screen_width / 2 * 256 / cur_cc_w +
-                  screen_width * 256;
-    uint16_t sy_top =
-        (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
-        screen_height * 256 / screen_width;
-    uint16_t sy_bot =
-        (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
-        screen_height * 256 / screen_width;
-    uint16_t sx_right =
-        (int32_t)cc_x * screen_width / 2 * 256 / cc_w + screen_width * 256;
 
     // Adjust to the next pixel center.
     int16_t offset = 128 - sx % 256;
