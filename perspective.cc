@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "draw.h"
+#include "log.h"
 #include "map.h"
 #include "screen.h"
 #include "trig.h"
@@ -177,7 +178,15 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     int16_t m_bot;
     uint16_t sy_top;
     uint16_t sy_bot;
-    int32_t m_denom = (int32_t)cc_x * cur_cc_w - (int32_t)cur_cc_x * cc_w;
+    Log lcur_cc_x = cur_cc_x;
+    Log lcur_cc_y_top = cur_cc_y_top;
+    Log lcur_cc_y_bot = cur_cc_y_bot;
+    Log lcur_cc_w = cur_cc_w;
+    Log lcc_x = cc_x;
+    Log lcc_y_top = cc_y_top;
+    Log lcc_y_bot = cc_y_bot;
+    Log lcc_w = cc_w;
+    Log m_denom = lcc_x / lcc_w - lcur_cc_x / lcur_cc_w;
     if (cur_top_above_top && top_above_top) {
       m_top = 0;
       sy_top = 0;
@@ -185,9 +194,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       DEBUG("Clipped top.\n");
     } else {
       // m = (y/w - cur_y/cur_w) / (x/w - cur_x/cur_w)
-      // m = (y*cur_w - cur_y*w) / (x*cur_w - cur_x*w)
-      m_top = ((int32_t)cc_y_top * cur_cc_w - (int32_t)cur_cc_y_top * cc_w) *
-              256 / m_denom;
+      m_top = (lcc_y_top / lcc_w - lcur_cc_y_top / lcur_cc_w) / m_denom *
+              Log::pow2(8);
       sy_top = (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
                screen_height / 2 * 256;
     }
@@ -197,8 +205,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cur_bot_below_bot = bot_below_bot = false;
       DEBUG("Clipped bot.\n");
     } else {
-      m_bot = ((int32_t)cc_y_bot * cur_cc_w - (int32_t)cur_cc_y_bot * cc_w) *
-              256 / m_denom;
+      m_bot = (lcc_y_bot / lcc_w - lcur_cc_y_bot / lcur_cc_w) / m_denom *
+              Log::pow2(8);
       sy_bot = (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
                screen_height / 2 * 256;
     }

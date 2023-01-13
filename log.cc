@@ -11,20 +11,28 @@ __attribute__((noinline)) Log::Log(bool sign, int16_t exp)
     : sign(sign), exp(exp) {}
 
 __attribute__((noinline)) Log::Log(int16_t val) : sign(val < 0), exp(0) {
-  if (val & 0xff00) {
-    while (val >> 8 != 1) {
-      val >>= 1;
+  if (val == -32768) {
+    exp = 32767;
+    return;
+  }
+
+  uint16_t v = val < 0 ? -val : val;
+  if (v & 0xff00) {
+    while (v >> 8 != 1) {
+      v >>= 1;
       exp += 2048;
     }
   } else {
-    while (val >> 8 != 1) {
-      val <<= 1;
+    while (v >> 8 != 1) {
+      v <<= 1;
       exp -= 2048;
     }
   }
 
-  exp += logt_lo[val & 0xff] | logt_hi[val & 0xff] << 8;
+  exp += logt_lo[v & 0xff] | logt_hi[v & 0xff] << 8;
 }
+
+Log Log::pow2(uint8_t k) { return Log(false, k * 2048); }
 
 __attribute__((noinline)) Log::operator int16_t() const {
   // 2^(-1) = 1/2, which, rounding to even, should round to zero. All negative
@@ -60,4 +68,18 @@ __attribute__((noinline)) Log::operator int16_t() const {
   return sign ? -uresult : uresult;
 }
 
-static Log Log::pow2(uint8_t k) { return Log(false, k * 2048); }
+Log Log::operator-() const { return Log(!sign, exp); }
+Log Log::operator*(const Log &other) const { return (Log)(*this) *= other; }
+Log &Log::operator*=(const Log &other) {
+  if (other.sign)
+    sign = !sign;
+  exp += other.exp;
+  return *this;
+}
+Log Log::operator/(const Log &other) const { return (Log)(*this) /= other; }
+Log &Log::operator/=(const Log &other) {
+  if (other.sign)
+    sign = !sign;
+  exp -= other.exp;
+  return *this;
+}
