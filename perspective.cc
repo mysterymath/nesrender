@@ -121,6 +121,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
     int16_t dw = cc_w - cur_cc_w;
 
+    uint16_t sx;
+    uint16_t sx_right;
     if (cur_left_of_left) {
       DEBUG("Wall crosses left frustum edge. Clipping.\n");
       DEBUG_CC("Cur", cur_cc);
@@ -138,7 +140,11 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
       cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
       cur_cc_w = -cur_cc_x;
+      sx = 0;
       DEBUG_CC("Clipped Cur", cur_cc);
+    } else {
+      sx = (int32_t)cur_cc_x * screen_width / 2 * 256 / cur_cc_w +
+           screen_width / 2 * 256;
     }
     if (right_of_right) {
       DEBUG("Wall crosses right frustum edge. Clipping.\n");
@@ -150,7 +156,11 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cc_y_top += (int32_t)dy_top * t_num / t_denom;
       cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
       cc_w = cc_x;
+      sx_right = screen_width * 256;
       DEBUG_CC("Clipped Next", cc);
+    } else {
+      sx_right = (int32_t)cc_x * screen_width / 2 * 256 / cc_w +
+                 screen_width / 2 * 256;
     }
 
 #if 0
@@ -201,16 +211,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     }
 #endif
 
-    uint16_t sx = (int32_t)cur_cc_x * screen_width / 2 * 256 / cur_cc_w +
-                  screen_width / 2 * 256;
     uint16_t sy_top =
         (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
         screen_height / 2 * 256;
     uint16_t sy_bot =
         (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
         screen_height / 2 * 256;
-    uint16_t sx_right =
-        (int32_t)cc_x * screen_width / 2 * 256 / cc_w + screen_width / 2 * 256;
 
     DEBUG("sx: %u:%u, sy_top: %u:%u, sy_bot: %u:%u, sx_right: %u:%u\n", sx >> 8,
           sx & 0xff, sy_top >> 8, sy_top & 0xff, sy_bot >> 8, sy_bot & 0xff,
