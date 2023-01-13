@@ -196,12 +196,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lcc_y_bot = cc_y_bot;
     Log lcc_w = cc_w;
 
-    Log lcur_sx = lcur_cc_x / lcur_cc_w * Log::pow2(14);
-    Log lsx = lcc_x / lcc_w * Log::pow2(14);
-    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w * Log::pow2(14);
-    Log lsy_top = lcc_y_top / lcc_w * Log::pow2(14);
-    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w * Log::pow2(14);
-    Log lsy_bot = lcc_y_bot / lcc_w * Log::pow2(14);
+    Log lcur_sx = lcur_cc_x / lcur_cc_w * Log::pow2(13);
+    Log lsx = lcc_x / lcc_w * Log::pow2(13);
+    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w * Log::pow2(13);
+    Log lsy_top = lcc_y_top / lcc_w * Log::pow2(13);
+    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w * Log::pow2(13);
+    Log lsy_bot = lcc_y_bot / lcc_w * Log::pow2(13);
 
     int16_t m_top;
     int16_t m_bot;
