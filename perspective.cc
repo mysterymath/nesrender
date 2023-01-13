@@ -61,6 +61,7 @@ static void move_to(uint16_t x, uint16_t y) {
   DEBUG_CC("Moved to CC:", cur_cc);
   cur_left_of_left = cur_cc_x < -cur_cc_w;
   cur_right_of_right = cur_cc_x > cur_cc_w;
+
   cur_bot_above_top =
       (int32_t)cur_cc_y_bot * screen_width < -cur_cc_w * (int32_t)screen_height;
   cur_top_below_bot =
