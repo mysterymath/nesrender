@@ -219,7 +219,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
                screen_height / 2 * 256;
     }
     if (cur_bot_below_bot && bot_below_bot) {
-      m_top = 0;
+      m_bot = 0;
       sy_bot = screen_height * 256;
       cur_bot_below_bot = bot_below_bot = false;
       DEBUG("Clipped bot.\n");
