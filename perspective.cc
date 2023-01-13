@@ -116,14 +116,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
-#if 0
     int16_t dx = cc_x - cur_cc_x;
     int16_t dy_top = cc_y_top - cur_cc_y_top;
     int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
     int16_t dw = cc_w - cur_cc_w;
 
-    int16_t m_top, m_bot;
-    if (cur_left) {
+    if (cur_left_of_left) {
       DEBUG("Wall crosses left frustum edge. Clipping.\n");
       DEBUG_CC("Cur", cur_cc);
       DEBUG_CC("Next", cc);
@@ -142,7 +140,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cur_cc_w = -cur_cc_x;
       DEBUG_CC("Clipped Cur", cur_cc);
     }
-    if (right) {
+    if (right_of_right) {
       DEBUG("Wall crosses right frustum edge. Clipping.\n");
       DEBUG_CC("Cur", cur_cc);
       DEBUG_CC("Next", cc);
@@ -155,6 +153,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       DEBUG_CC("Clipped Next", cc);
     }
 
+#if 0
     bool cur_top_above_top =
         cur_cc_y_top * screen_width < -cur_cc_w * screen_height;
     bool top_above_top = cc_y_top * screen_width < -cc_w * screen_height;
