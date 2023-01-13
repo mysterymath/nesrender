@@ -174,10 +174,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
                  screen_width / 2 * 256;
     }
 
-    int16_t m_top;
-    int16_t m_bot;
-    uint16_t sy_top;
-    uint16_t sy_bot;
     Log lcur_cc_x = cur_cc_x;
     Log lcur_cc_y_top = cur_cc_y_top;
     Log lcur_cc_y_bot = cur_cc_y_bot;
@@ -186,16 +182,26 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lcc_y_top = cc_y_top;
     Log lcc_y_bot = cc_y_bot;
     Log lcc_w = cc_w;
-    Log m_denom = lcc_x / lcc_w - lcur_cc_x / lcur_cc_w;
+
+    Log lcur_sx = lcur_cc_x / lcur_cc_w * Log::pow2(14);
+    Log lsx = lcc_x / lcc_w * Log::pow2(14);
+    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w * Log::pow2(14);
+    Log lsy_top = lcc_y_top / lcc_w * Log::pow2(14);
+    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w * Log::pow2(14);
+    Log lsy_bot = lcc_y_bot / lcc_w * Log::pow2(14);
+
+    int16_t m_top;
+    int16_t m_bot;
+    uint16_t sy_top;
+    uint16_t sy_bot;
+    Log m_denom = lsx - lcur_sx;
     if (cur_top_above_top && top_above_top) {
       m_top = 0;
       sy_top = 0;
       cur_top_above_top = top_above_top = false;
       DEBUG("Clipped top.\n");
     } else {
-      // m = (y/w - cur_y/cur_w) / (x/w - cur_x/cur_w)
-      m_top = (lcc_y_top / lcc_w - lcur_cc_y_top / lcur_cc_w) / m_denom *
-              Log::pow2(8);
+      m_top = Log(lsy_top - lcur_sy_top) / m_denom * Log::pow2(8);
       sy_top = (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
                screen_height / 2 * 256;
     }
@@ -205,8 +211,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cur_bot_below_bot = bot_below_bot = false;
       DEBUG("Clipped bot.\n");
     } else {
-      m_bot = (lcc_y_bot / lcc_w - lcur_cc_y_bot / lcur_cc_w) / m_denom *
-              Log::pow2(8);
+      m_bot = Log(lsy_bot - lcur_sy_bot) / m_denom * Log::pow2(8);
       sy_bot = (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
                screen_height / 2 * 256;
     }
