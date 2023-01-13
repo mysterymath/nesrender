@@ -39,6 +39,7 @@ static int16_t cur_cc_x;
 static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
+
 static bool cur_left_of_left;
 static bool cur_right_of_right;
 static bool cur_bot_above_top;
@@ -53,23 +54,31 @@ constexpr int16_t wall_bot_z = 20;
   DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
         NAME##_w)
 
+// log2(60/64) * 2^11
+const auto h_over_w = Log(false, -191);
+
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
   xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
   z_to_cc(wall_top_z, &cur_cc_y_top);
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
   DEBUG_CC("Moved to CC:", cur_cc);
+
+  Log lcur_cc_x = cur_cc_x;
+  Log lcur_cc_y_bot = cur_cc_y_bot;
+  Log lcur_cc_y_top = cur_cc_y_top;
+  Log lcur_cc_w = cur_cc_w;
+
   cur_left_of_left = cur_cc_x < -cur_cc_w;
   cur_right_of_right = cur_cc_x > cur_cc_w;
 
-  cur_bot_above_top =
-      (int32_t)cur_cc_y_bot * screen_width < -cur_cc_w * (int32_t)screen_height;
-  cur_top_below_bot =
-      (int32_t)cur_cc_y_top * screen_width > (int32_t)cur_cc_w * screen_height;
-  cur_top_above_top =
-      (int32_t)cur_cc_y_top * screen_width < -cur_cc_w * (int32_t)screen_height;
-  cur_bot_below_bot =
-      (int32_t)cur_cc_y_bot * screen_width > (int32_t)cur_cc_w * screen_height;
+  Log cur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
+  Log cur_sy_top = lcur_cc_y_top / lcur_cc_w;
+
+  cur_bot_above_top = cur_sy_bot < -h_over_w;
+  cur_top_below_bot = cur_sy_top > h_over_w;
+  cur_top_above_top = cur_sy_top < -h_over_w;
+  cur_bot_below_bot = cur_sy_bot > h_over_w;
 }
 
 void left_edge(int32_t *begin, int32_t *delta);
@@ -118,7 +127,10 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         cur_right_of_right && right_of_right ||
         cur_bot_above_top && bot_above_top ||
         cur_top_below_bot && top_below_bot) {
-      DEBUG("Frustum cull.\n");
+      DEBUG("Frustum cull: %d %d %d %d\n", cur_left_of_left && left_of_left,
+            cur_right_of_right && right_of_right,
+            cur_bot_above_top && bot_above_top,
+            cur_top_below_bot && top_below_bot);
       goto done;
     }
 
@@ -300,7 +312,6 @@ template <bool x_odd>
 void draw_column(uint8_t color, uint8_t *col, uint8_t y_top, uint8_t y_bot) {
   if (y_top >= y_bot)
     return;
-  DEBUG("%d, %d, %d\n", (col - fb_next) / 30, y_top, y_bot);
   uint8_t i = y_top / 2;
   if (y_top & 1) {
     if (x_odd) {

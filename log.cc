@@ -92,3 +92,20 @@ Log &Log::operator/=(const Log &other) {
     exp -= other.exp;
   return *this;
 }
+
+bool Log::operator<(const Log &other) const {
+  if (sign != other.sign)
+    return sign;
+  return (exp < other.exp) ^ sign;
+}
+bool Log::operator<=(const Log &other) const { return !(*this > other); }
+bool Log::operator>(const Log &other) const {
+  if (sign != other.sign)
+    return !sign;
+  return (exp > other.exp) ^ sign;
+}
+bool Log::operator>=(const Log &other) const { return !(*this < other); }
+bool Log::operator==(const Log &other) const {
+  return sign == other.sign && exp == other.exp;
+}
+bool Log::operator!=(const Log &other) const { return !(*this == other); }
