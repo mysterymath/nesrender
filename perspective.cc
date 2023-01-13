@@ -232,8 +232,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       offset += 256;
     if (offset) {
       sx += offset;
-      sy_top += (int32_t)m_top * offset / 256;
-      sy_bot += (int32_t)m_bot * offset / 256;
+      sy_top += (int32_t)m_top * offset >> 8;
+      sy_bot += (int32_t)m_bot * offset >> 8;
     }
 
     uint8_t pix_x_begin = sx / 256;
