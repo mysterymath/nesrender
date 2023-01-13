@@ -11,6 +11,8 @@ add_executable(render
 	line.cc
 	main.cc
 	map.cc
+	log.cc
+	logt.c
 	mul.c
 	overhead.cc
 	perspective.cc
