@@ -42,6 +42,8 @@ static bool cur_left_of_left;
 static bool cur_right_of_right;
 static bool cur_bot_above_top;
 static bool cur_top_below_bot;
+static bool cur_top_above_top;
+static bool cur_bot_below_bot;
 
 constexpr int16_t wall_top_z = 80;
 constexpr int16_t wall_bot_z = 20;
@@ -62,6 +64,10 @@ static void move_to(uint16_t x, uint16_t y) {
       (int32_t)cur_cc_y_bot * screen_width < -cur_cc_w * (int32_t)screen_height;
   cur_top_below_bot =
       (int32_t)cur_cc_y_top * screen_width > (int32_t)cur_cc_w * screen_height;
+  cur_top_above_top =
+      (int32_t)cur_cc_y_top * screen_width < -cur_cc_w * (int32_t)screen_height;
+  cur_bot_below_bot =
+      (int32_t)cur_cc_y_bot * screen_width > (int32_t)cur_cc_w * screen_height;
 }
 
 void left_edge(int32_t *begin, int32_t *delta);
@@ -96,6 +102,10 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       (int32_t)cc_y_bot * screen_width < -cc_w * (int32_t)screen_height;
   bool top_below_bot =
       (int32_t)cc_y_top * screen_width > (int32_t)cc_w * screen_height;
+  bool top_above_top =
+      (int32_t)cc_y_top * screen_width < -cc_w * (int32_t)screen_height;
+  bool bot_below_bot =
+      (int32_t)cc_y_bot * screen_width > (int32_t)cc_w * screen_height;
 
   // There is homogeneous weirdness when both w are zero. Disallow.
   if (cc_w <= 0 && cur_cc_w <= 0)
@@ -163,35 +173,35 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
                  screen_width / 2 * 256;
     }
 
-#if 0
-    bool cur_top_above_top =
-        cur_cc_y_top * screen_width < -cur_cc_w * screen_height;
-    bool top_above_top = cc_y_top * screen_width < -cc_w * screen_height;
-    bool cur_bot_below_bot =
-        cur_cc_y_bot * screen_width > cur_cc_w * screen_height;
-    bool bot_below_bot = cc_y_bot * screen_width > cc_w * screen_height;
+    int16_t m_top;
+    int16_t m_bot;
+    uint16_t sy_top;
+    uint16_t sy_bot;
+    int32_t m_denom = (int32_t)cc_x * cur_cc_w - (int32_t)cur_cc_x * cc_w;
     if (cur_top_above_top && top_above_top) {
-      cur_cc_y_top = -cur_cc_w * screen_height / screen_width;
-      cc_y_top = -cc_w * screen_height / screen_width;
+      m_top = 0;
+      sy_top = 0;
       cur_top_above_top = top_above_top = false;
+      DEBUG("Clipped top.\n");
+    } else {
+      // m = (y/w - cur_y/cur_w) / (x/w - cur_x/cur_w)
+      // m = (y*cur_w - cur_y*w) / (x*cur_w - cur_x*w)
+      m_top = ((int32_t)cc_y_top * cur_cc_w - (int32_t)cur_cc_y_top * cc_w) *
+              256 / m_denom;
+      sy_top = (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
+               screen_height / 2 * 256;
     }
     if (cur_bot_below_bot && bot_below_bot) {
-      cur_cc_y_bot = cur_cc_w * screen_height / screen_width;
-      cc_y_bot = cc_w * screen_height / screen_width;
+      m_top = 0;
+      sy_bot = screen_height * 256;
       cur_bot_below_bot = bot_below_bot = false;
+      DEBUG("Clipped bot.\n");
+    } else {
+      m_bot = ((int32_t)cc_y_bot * cur_cc_w - (int32_t)cur_cc_y_bot * cc_w) *
+              256 / m_denom;
+      sy_bot = (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
+               screen_height / 2 * 256;
     }
-#endif
-
-    // Compute slopes for top and bottom.
-    // m = (y/w - cur_y/cur_w) / (x/w - cur_x/cur_w)
-    // m = (y*cur_w - cur_y*w) / (x*cur_w - cur_x*w)
-    int32_t m_denom = (int32_t)cc_x * cur_cc_w - (int32_t)cur_cc_x * cc_w;
-    int16_t m_top =
-        ((int32_t)cc_y_top * cur_cc_w - (int32_t)cur_cc_y_top * cc_w) * 256 /
-        m_denom;
-    int16_t m_bot =
-        ((int32_t)cc_y_bot * cur_cc_w - (int32_t)cur_cc_y_bot * cc_w) * 256 /
-        m_denom;
 
     DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
           m_bot & 0xff);
@@ -210,13 +220,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         sy_bot = (int32_t)cur_cc_y_bot * screen_width * 256 / cur_cc_w;
     }
 #endif
-
-    uint16_t sy_top =
-        (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
-        screen_height / 2 * 256;
-    uint16_t sy_bot =
-        (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
-        screen_height / 2 * 256;
 
     DEBUG("sx: %u:%u, sy_top: %u:%u, sy_bot: %u:%u, sx_right: %u:%u\n", sx >> 8,
           sx & 0xff, sy_top >> 8, sy_top & 0xff, sy_bot >> 8, sy_bot & 0xff,
@@ -274,6 +277,8 @@ done:
   cur_right_of_right = right_of_right;
   cur_bot_above_top = bot_above_top;
   cur_top_below_bot = top_below_bot;
+  cur_top_above_top = top_above_top;
+  cur_bot_below_bot = bot_below_bot;
 }
 
 // Note: y_bot is exclusive.
