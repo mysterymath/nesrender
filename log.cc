@@ -9,7 +9,7 @@ extern const uint8_t alogt_hi[];
 
 Log::Log(bool sign, int16_t exp) : sign(sign), exp(exp) {}
 
-__attribute__((noinline)) Log::Log(int16_t val) : sign(val < 0), exp(0) {
+Log::Log(int16_t val) : sign(val < 0), exp(0) {
   if (val == 0) {
     exp = -32768;
     return;
@@ -37,7 +37,7 @@ __attribute__((noinline)) Log::Log(int16_t val) : sign(val < 0), exp(0) {
 
 Log Log::pow2(uint8_t k) { return Log(false, k << 11); }
 
-__attribute__((noinline)) Log::operator int16_t() const {
+Log::operator int16_t() const {
   // 2^(-1) = 1/2, which, rounding to even, should round to zero. All negative
   // numbers above that should round to 1.
   if (exp <= -1 * 2048)

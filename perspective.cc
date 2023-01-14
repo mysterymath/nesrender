@@ -54,8 +54,8 @@ constexpr int16_t wall_bot_z = 20;
   DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
         NAME##_w)
 
-// log2(60/64) * 2^11
-const auto h_over_w = Log(false, -191);
+// 60/64
+const auto lh_over_w = Log(false, -191);
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
@@ -75,10 +75,10 @@ static void move_to(uint16_t x, uint16_t y) {
   Log cur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
   Log cur_sy_top = lcur_cc_y_top / lcur_cc_w;
 
-  cur_bot_above_top = cur_sy_bot < -h_over_w;
-  cur_top_below_bot = cur_sy_top > h_over_w;
-  cur_top_above_top = cur_sy_top < -h_over_w;
-  cur_bot_below_bot = cur_sy_bot > h_over_w;
+  cur_bot_above_top = cur_sy_bot < -lh_over_w;
+  cur_top_below_bot = cur_sy_top > lh_over_w;
+  cur_top_above_top = cur_sy_top < -lh_over_w;
+  cur_bot_below_bot = cur_sy_bot > lh_over_w;
 }
 
 void left_edge(int32_t *begin, int32_t *delta);
@@ -196,27 +196,28 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lcc_y_bot = cc_y_bot;
     Log lcc_w = cc_w;
 
-    Log lcur_sx = lcur_cc_x / lcur_cc_w * Log::pow2(13);
-    Log lsx = lcc_x / lcc_w * Log::pow2(13);
-    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w * Log::pow2(13);
-    Log lsy_top = lcc_y_top / lcc_w * Log::pow2(13);
-    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w * Log::pow2(13);
-    Log lsy_bot = lcc_y_bot / lcc_w * Log::pow2(13);
+    Log lcur_sx = lcur_cc_x / lcur_cc_w;
+    Log lsx = lcc_x / lcc_w;
+    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w;
+    Log lsy_top = lcc_y_top / lcc_w;
+    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
+    Log lsy_bot = lcc_y_bot / lcc_w;
 
     int16_t m_top;
     int16_t m_bot;
     uint16_t sy_top;
     uint16_t sy_bot;
-    Log m_denom = lsx - lcur_sx;
+    Log iscale = Log::pow2(13);
+    Log m_denom = lsx * iscale - lcur_sx * iscale;
     if (cur_top_above_top && top_above_top) {
       m_top = 0;
       sy_top = 0;
       cur_top_above_top = top_above_top = false;
       DEBUG("Clipped top.\n");
     } else {
-      m_top = Log(lsy_top - lcur_sy_top) / m_denom * Log::pow2(8);
-      sy_top = (int32_t)cur_cc_y_top * screen_width / 2 * 256 / cur_cc_w +
-               screen_height / 2 * 256;
+      m_top =
+          Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom * Log::pow2(8);
+      sy_top = lcur_sy_top * Log::pow2(13) + screen_height / 2 * 256;
     }
     if (cur_bot_below_bot && bot_below_bot) {
       m_bot = 0;
@@ -224,9 +225,9 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       cur_bot_below_bot = bot_below_bot = false;
       DEBUG("Clipped bot.\n");
     } else {
-      m_bot = Log(lsy_bot - lcur_sy_bot) / m_denom * Log::pow2(8);
-      sy_bot = (int32_t)cur_cc_y_bot * screen_width / 2 * 256 / cur_cc_w +
-               screen_height / 2 * 256;
+      m_bot =
+          Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom * Log::pow2(8);
+      sy_bot = lcur_sy_bot * Log::pow2(13) + screen_height / 2 * 256;
     }
 
     DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
