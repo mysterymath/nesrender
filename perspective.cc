@@ -203,30 +203,34 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
     Log lsy_bot = lcc_y_bot / lcc_w;
 
+    Log lm_top;
     int16_t m_top;
+    Log lm_bot;
     int16_t m_bot;
     uint16_t sy_top;
     uint16_t sy_bot;
     Log iscale = Log::pow2(13);
     Log m_denom = lsx * iscale - lcur_sx * iscale;
     if (cur_top_above_top && top_above_top) {
+      lm_top = Log::zero();
       m_top = 0;
       sy_top = 0;
       cur_top_above_top = top_above_top = false;
       DEBUG("Clipped top.\n");
     } else {
-      m_top =
-          Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom * Log::pow2(8);
+      lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom;
+      m_top = lm_top * Log::pow2(8);
       sy_top = lcur_sy_top * Log::pow2(13) + screen_height / 2 * 256;
     }
     if (cur_bot_below_bot && bot_below_bot) {
+      lm_bot = Log::zero();
       m_bot = 0;
       sy_bot = screen_height * 256;
       cur_bot_below_bot = bot_below_bot = false;
       DEBUG("Clipped bot.\n");
     } else {
-      m_bot =
-          Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom * Log::pow2(8);
+      lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
+      m_bot = lm_bot * Log::pow2(8);
       sy_bot = lcur_sy_bot * Log::pow2(13) + screen_height / 2 * 256;
     }
 
@@ -262,8 +266,9 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       offset += 256;
     if (offset) {
       sx += offset;
-      sy_top += (int32_t)m_top * offset >> 8;
-      sy_bot += (int32_t)m_bot * offset >> 8;
+      Log loffset = Log(offset);
+      sy_top += lm_top * loffset;
+      sy_bot += lm_bot * loffset;
     }
 
     uint8_t pix_x_begin = sx / 256;

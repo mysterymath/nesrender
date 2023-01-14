@@ -36,6 +36,7 @@ Log::Log(int16_t val) : sign(val < 0), exp(0) {
 }
 
 Log Log::pow2(uint8_t k) { return Log(false, k << 11); }
+Log Log::zero() { return Log(false, -32768); }
 
 Log::operator int16_t() const {
   // 2^(-1) = 1/2, which, rounding to even, should round to zero. All negative
