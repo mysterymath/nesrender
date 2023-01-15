@@ -39,6 +39,10 @@ static int16_t cur_cc_x;
 static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
+static Log lcur_cc_x;
+static Log lcur_cc_y_top;
+static Log lcur_cc_y_bot;
+static Log lcur_cc_w;
 
 static bool cur_left_of_left;
 static bool cur_right_of_right;
@@ -64,10 +68,10 @@ static void move_to(uint16_t x, uint16_t y) {
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
   DEBUG_CC("Moved to CC:", cur_cc);
 
-  Log lcur_cc_x = cur_cc_x;
-  Log lcur_cc_y_bot = cur_cc_y_bot;
-  Log lcur_cc_y_top = cur_cc_y_top;
-  Log lcur_cc_w = cur_cc_w;
+  lcur_cc_x = cur_cc_x;
+  lcur_cc_y_bot = cur_cc_y_bot;
+  lcur_cc_y_top = cur_cc_y_top;
+  lcur_cc_w = cur_cc_w;
 
   cur_left_of_left = cur_cc_x < -cur_cc_w;
   cur_right_of_right = cur_cc_x > cur_cc_w;
@@ -107,13 +111,18 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   int16_t orig_cc_y_bot = cc_y_bot;
   int16_t orig_cc_w = cc_w;
 
-  Log lcur_cc_x = cur_cc_x;
-  Log lcur_cc_w = cur_cc_w;
-  Log lcc_x = cc_x;
-  Log lcc_w = cc_w;
+  Log lcc_x = orig_cc_x;
+  Log lcc_y_top = cc_y_top;
+  Log lcc_y_bot = cc_y_bot;
+  Log lcc_w = orig_cc_w;
 
-  Log lsy_top = Log(cc_y_top) / lcc_w;
-  Log lsy_bot = Log(cc_y_bot) / lcc_w;
+  Log lorig_cc_x = lcc_x;
+  Log lorig_cc_y_top = lcc_y_top;
+  Log lorig_cc_y_bot = lcc_y_bot;
+  Log lorig_cc_w = lcc_w;
+
+  Log lsy_top = lcc_y_top / lcc_w;
+  Log lsy_bot = lcc_y_bot / lcc_w;
 
   bool left_of_left = cc_x < -cc_w;
   bool right_of_right = cc_x > cc_w;
@@ -185,6 +194,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         lcc_x = cc_x;
         cc_y_top += ldy_top * t_num / t_denom;
         cc_y_bot += ldy_bot * t_num / t_denom;
+        // Note: No need to update lcc_y, as they're unused past this point.
         cc_w = cc_x;
         lcc_w = cc_w;
         lsy_top = Log(cc_y_top) / lcc_w;
@@ -195,8 +205,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
     Log lcur_sx = lcur_cc_x / lcur_cc_w;
     Log lsx = lcc_x / lcc_w;
-    Log lcur_sy_top = Log(cur_cc_y_top) / lcur_cc_w;
-    Log lcur_sy_bot = Log(cur_cc_y_bot) / lcur_cc_w;
+    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w;
+    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
 
     uint16_t sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
     uint16_t sx_right = lsx * Log::pow2(13) + screen_width / 2 * 256;
@@ -303,6 +313,10 @@ done:
   cur_cc_y_top = orig_cc_y_top;
   cur_cc_y_bot = orig_cc_y_bot;
   cur_cc_w = orig_cc_w;
+  lcur_cc_x = lorig_cc_x;
+  lcur_cc_y_top = lorig_cc_y_top;
+  lcur_cc_y_bot = lorig_cc_y_bot;
+  lcur_cc_w = lorig_cc_w;
   cur_left_of_left = left_of_left;
   cur_right_of_right = right_of_right;
   cur_bot_above_top = bot_above_top;
