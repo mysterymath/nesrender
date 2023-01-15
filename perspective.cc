@@ -107,7 +107,9 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   int16_t orig_cc_y_bot = cc_y_bot;
   int16_t orig_cc_w = cc_w;
 
+  Log lcur_cc_x = cur_cc_x;
   Log lcur_cc_w = cur_cc_w;
+  Log lcc_x = cc_x;
   Log lcc_w = cc_w;
 
   Log lsy_top = Log(cc_y_top) / lcc_w;
@@ -137,7 +139,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     }
 
     // Use cross product to backface cull.
-    if ((int32_t)cur_cc_x * cc_w >= (int32_t)cur_cc_w * cc_x) {
+    if (lcur_cc_x * lcc_w >= lcur_cc_w * lcc_x) {
       DEBUG("Backface cull.\n");
       goto done;
     }
@@ -166,6 +168,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         Log t_num = -cur_cc_w - cur_cc_x;
         Log t_denom = dx + dw;
         cur_cc_x += ldx * t_num / t_denom;
+        lcur_cc_x = cur_cc_x;
         cur_cc_y_top += ldy_top * t_num / t_denom;
         cur_cc_y_bot += ldy_bot * t_num / t_denom;
         cur_cc_w = -cur_cc_x;
@@ -179,6 +182,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         Log t_num = cc_w - cc_x;
         Log t_denom = dx - dw;
         cc_x += ldx * t_num / t_denom;
+        lcc_x = cc_x;
         cc_y_top += ldy_top * t_num / t_denom;
         cc_y_bot += ldy_bot * t_num / t_denom;
         cc_w = cc_x;
@@ -189,8 +193,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       }
     }
 
-    Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
-    Log lsx = Log(cc_x) / lcc_w;
+    Log lcur_sx = lcur_cc_x / lcur_cc_w;
+    Log lsx = lcc_x / lcc_w;
     Log lcur_sy_top = Log(cur_cc_y_top) / lcur_cc_w;
     Log lcur_sy_bot = Log(cur_cc_y_bot) / lcur_cc_w;
 
