@@ -140,62 +140,58 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
-    int16_t dx = cc_x - cur_cc_x;
-    int16_t dy_top = cc_y_top - cur_cc_y_top;
-    int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
-    int16_t dw = cc_w - cur_cc_w;
-    Log ldx = dx;
-    Log ldy_top = dy_top;
-    Log ldy_bot = dy_bot;
-    Log ldw = dw;
+    if (cur_left_of_left || right_of_right) {
+      int16_t dx = cc_x - cur_cc_x;
+      int16_t dy_top = cc_y_top - cur_cc_y_top;
+      int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
+      int16_t dw = cc_w - cur_cc_w;
+      Log ldx = dx;
+      Log ldy_top = dy_top;
+      Log ldy_bot = dy_bot;
+      Log ldw = dw;
 
-    if (cur_left_of_left) {
-      DEBUG("Wall crosses left frustum edge. Clipping.\n");
-      DEBUG_CC("Cur", cur_cc);
-      DEBUG_CC("Next", cc);
-      // r(t) = cur + vt
-      // w(t)_x = -w(t)_w
-      // cur_x + dxt = -cur_w - dw*t;
-      // t*(dx + dw) = -cur_w - cur_x
-      // t = (-cur_w - cur_x) / (dx + dw)
-      // Since the wall cannot be parallel to the left frustum edge, dw + dx !=
-      // 0.
-      Log t_num = -cur_cc_w - cur_cc_x;
-      Log t_denom = dx + dw;
-      cur_cc_x += ldx * t_num / t_denom;
-      cur_cc_y_top += ldy_top * t_num / t_denom;
-      cur_cc_y_bot += ldy_bot * t_num / t_denom;
-      cur_cc_w = -cur_cc_x;
-      DEBUG_CC("Clipped Cur", cur_cc);
-    }
-    if (right_of_right) {
-      DEBUG("Wall crosses right frustum edge. Clipping.\n");
-      DEBUG_CC("Cur", cur_cc);
-      DEBUG_CC("Next", cc);
-      Log t_num = cc_w - cc_x;
-      Log t_denom = dx - dw;
-      cc_x += ldx * t_num / t_denom;
-      cc_y_top += ldy_top * t_num / t_denom;
-      cc_y_bot += ldy_bot * t_num / t_denom;
-      cc_w = cc_x;
-      DEBUG_CC("Clipped Next", cc);
+      if (cur_left_of_left) {
+        DEBUG("Wall crosses left frustum edge. Clipping.\n");
+        DEBUG_CC("Cur", cur_cc);
+        DEBUG_CC("Next", cc);
+        // r(t) = cur + vt
+        // w(t)_x = -w(t)_w
+        // cur_x + dxt = -cur_w - dw*t;
+        // t*(dx + dw) = -cur_w - cur_x
+        // t = (-cur_w - cur_x) / (dx + dw)
+        // Since the wall cannot be parallel to the left frustum edge, dw + dx
+        // != 0.
+        Log t_num = -cur_cc_w - cur_cc_x;
+        Log t_denom = dx + dw;
+        cur_cc_x += ldx * t_num / t_denom;
+        cur_cc_y_top += ldy_top * t_num / t_denom;
+        cur_cc_y_bot += ldy_bot * t_num / t_denom;
+        cur_cc_w = -cur_cc_x;
+        DEBUG_CC("Clipped Cur", cur_cc);
+      }
+      if (right_of_right) {
+        DEBUG("Wall crosses right frustum edge. Clipping.\n");
+        DEBUG_CC("Cur", cur_cc);
+        DEBUG_CC("Next", cc);
+        Log t_num = cc_w - cc_x;
+        Log t_denom = dx - dw;
+        cc_x += ldx * t_num / t_denom;
+        cc_y_top += ldy_top * t_num / t_denom;
+        cc_y_bot += ldy_bot * t_num / t_denom;
+        cc_w = cc_x;
+        DEBUG_CC("Clipped Next", cc);
+      }
     }
 
-    Log lcur_cc_x = cur_cc_x;
-    Log lcur_cc_y_top = cur_cc_y_top;
-    Log lcur_cc_y_bot = cur_cc_y_bot;
     Log lcur_cc_w = cur_cc_w;
-    Log lcc_x = cc_x;
-    Log lcc_y_top = cc_y_top;
-    Log lcc_y_bot = cc_y_bot;
     Log lcc_w = cc_w;
 
-    Log lcur_sx = lcur_cc_x / lcur_cc_w;
-    Log lsx = lcc_x / lcc_w;
-    Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w;
-    Log lsy_top = lcc_y_top / lcc_w;
-    Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
-    Log lsy_bot = lcc_y_bot / lcc_w;
+    Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
+    Log lsx = Log(cc_x) / lcc_w;
+    Log lcur_sy_top = Log(cur_cc_y_top) / lcur_cc_w;
+    Log lsy_top = Log(cc_y_top) / lcc_w;
+    Log lcur_sy_bot = Log(cur_cc_y_bot) / lcur_cc_w;
+    Log lsy_bot = Log(cc_y_bot) / lcc_w;
 
     uint16_t sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
     uint16_t sx_right = lsx * Log::pow2(13) + screen_width / 2 * 256;
