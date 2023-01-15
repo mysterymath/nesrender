@@ -369,24 +369,34 @@ void draw_column_even(uint8_t ceil_color, uint8_t wall_color,
                       uint8_t floor_color, uint8_t *col, uint8_t y_top,
                       uint8_t y_bot) {
   uint8_t i;
-  for (i = 0; i < y_top / 2; i++) {
-    col[i] &= 0b11110000;
-    col[i] &= ceil_color << 2 | ceil_color;
+  if (!ceil_color) {
+    i = y_top / 2;
+  } else {
+    for (i = 0; i < y_top / 2; i++) {
+      col[i] &= 0b11110000;
+      col[i] &= ceil_color << 2 | ceil_color;
+    }
   }
   if (y_top & 1) {
     col[i] &= 0b11110000;
     col[i] |= wall_color << 2 | ceil_color;
     i++;
   }
-  for (; i < y_bot / 2; i++) {
-    col[i] &= 0b11110000;
-    col[i] |= wall_color << 2 | wall_color;
+  if (!wall_color) {
+    i = y_bot / 2;
+  } else {
+    for (; i < y_bot / 2; i++) {
+      col[i] &= 0b11110000;
+      col[i] |= wall_color << 2 | wall_color;
+    }
   }
   if (y_bot & 1) {
     col[i] &= 0b11110000;
     col[i] |= floor_color << 2 | wall_color;
     i++;
   }
+  if (!floor_color)
+    return;
   for (; i < screen_height / 2; i++) {
     col[i] &= 0b11110000;
     col[i] |= floor_color << 2 | floor_color;
