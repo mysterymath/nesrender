@@ -329,25 +329,35 @@ done:
 void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
                      uint8_t floor_color, uint8_t *col, uint8_t y_top,
                      uint8_t y_bot) {
-  uint8_t i = y_top / 2;
-  for (i = 0; i < y_top / 2; i++) {
-    col[i] &= 0b00001111;
-    col[i] &= ceil_color << 6 | ceil_color << 4;
+  uint8_t i;
+  if (!ceil_color) {
+    i = y_top / 2;
+  } else {
+    for (i = 0; i < y_top / 2; i++) {
+      col[i] &= 0b00001111;
+      col[i] &= ceil_color << 6 | ceil_color << 4;
+    }
   }
   if (y_top & 1) {
     col[i] &= 0b00001111;
     col[i] |= wall_color << 6 | ceil_color << 4;
     i++;
   }
-  for (; i < y_bot / 2; i++) {
-    col[i] &= 0b00001111;
-    col[i] |= wall_color << 6 | wall_color << 4;
+  if (!wall_color) {
+    i = y_bot / 2;
+  } else {
+    for (; i < y_bot / 2; i++) {
+      col[i] &= 0b00001111;
+      col[i] |= wall_color << 6 | wall_color << 4;
+    }
   }
   if (y_bot & 1) {
     col[i] &= 0b00001111;
     col[i] |= floor_color << 6 | wall_color << 4;
     i++;
   }
+  if (!floor_color)
+    return;
   for (; i < screen_height / 2; i++) {
     col[i] &= 0b00001111;
     col[i] |= floor_color << 6 | floor_color << 4;
@@ -358,7 +368,7 @@ void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
 void draw_column_even(uint8_t ceil_color, uint8_t wall_color,
                       uint8_t floor_color, uint8_t *col, uint8_t y_top,
                       uint8_t y_bot) {
-  uint8_t i = y_top / 2;
+  uint8_t i;
   for (i = 0; i < y_top / 2; i++) {
     col[i] &= 0b11110000;
     col[i] &= ceil_color << 2 | ceil_color;
