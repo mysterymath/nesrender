@@ -55,7 +55,7 @@ constexpr int16_t wall_bot_z = 20;
         NAME##_w)
 
 // 60/64
-const auto lh_over_w = Log(false, -191);
+constexpr Log lh_over_w(false, -191);
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);

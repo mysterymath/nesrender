@@ -7,8 +7,6 @@ extern const uint8_t alogt_lo[];
 extern const uint8_t alogt_hi[];
 }
 
-Log::Log(bool sign, int16_t exp) : sign(sign), exp(exp) {}
-
 Log::Log(int16_t val) : sign(val < 0), exp(0) {
   if (val == 0) {
     exp = -32768;
@@ -34,9 +32,6 @@ Log::Log(int16_t val) : sign(val < 0), exp(0) {
 
   exp += logt_lo[v & 0xff] | logt_hi[v & 0xff] << 8;
 }
-
-Log Log::pow2(uint8_t k) { return Log(false, k << 11); }
-Log Log::zero() { return Log(false, -32768); }
 
 Log::operator int16_t() const {
   // 2^(-1) = 1/2, which, rounding to even, should round to zero. All negative
