@@ -107,16 +107,18 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   int16_t orig_cc_y_bot = cc_y_bot;
   int16_t orig_cc_w = cc_w;
 
+  Log lcur_cc_w = cur_cc_w;
+  Log lcc_w = cc_w;
+
+  Log lsy_top = Log(cc_y_top) / lcc_w;
+  Log lsy_bot = Log(cc_y_bot) / lcc_w;
+
   bool left_of_left = cc_x < -cc_w;
   bool right_of_right = cc_x > cc_w;
-  bool bot_above_top =
-      (int32_t)cc_y_bot * screen_width < -cc_w * (int32_t)screen_height;
-  bool top_below_bot =
-      (int32_t)cc_y_top * screen_width > (int32_t)cc_w * screen_height;
-  bool top_above_top =
-      (int32_t)cc_y_top * screen_width < -cc_w * (int32_t)screen_height;
-  bool bot_below_bot =
-      (int32_t)cc_y_bot * screen_width > (int32_t)cc_w * screen_height;
+  bool bot_above_top = lsy_bot < -lh_over_w;
+  bool top_below_bot = lsy_top > lh_over_w;
+  bool top_above_top = lsy_top < -lh_over_w;
+  bool bot_below_bot = lsy_bot > lh_over_w;
 
   // There is homogeneous weirdness when both w are zero. Disallow.
   if (cc_w <= 0 && cur_cc_w <= 0)
@@ -167,6 +169,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         cur_cc_y_top += ldy_top * t_num / t_denom;
         cur_cc_y_bot += ldy_bot * t_num / t_denom;
         cur_cc_w = -cur_cc_x;
+        lcur_cc_w = cur_cc_w;
         DEBUG_CC("Clipped Cur", cur_cc);
       }
       if (right_of_right) {
@@ -179,19 +182,17 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         cc_y_top += ldy_top * t_num / t_denom;
         cc_y_bot += ldy_bot * t_num / t_denom;
         cc_w = cc_x;
+        lcc_w = cc_w;
+        lsy_top = Log(cc_y_top) / lcc_w;
+        lsy_bot = Log(cc_y_bot) / lcc_w;
         DEBUG_CC("Clipped Next", cc);
       }
     }
 
-    Log lcur_cc_w = cur_cc_w;
-    Log lcc_w = cc_w;
-
     Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
     Log lsx = Log(cc_x) / lcc_w;
     Log lcur_sy_top = Log(cur_cc_y_top) / lcur_cc_w;
-    Log lsy_top = Log(cc_y_top) / lcc_w;
     Log lcur_sy_bot = Log(cur_cc_y_bot) / lcur_cc_w;
-    Log lsy_bot = Log(cc_y_bot) / lcc_w;
 
     uint16_t sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
     uint16_t sx_right = lsx * Log::pow2(13) + screen_width / 2 * 256;
