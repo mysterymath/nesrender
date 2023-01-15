@@ -327,26 +327,6 @@ done:
 }
 
 // Note: y_bot is exclusive.
-void draw_column_even(uint8_t color, uint8_t *col, uint8_t y_top,
-                      uint8_t y_bot) {
-  uint8_t i = y_top / 2;
-  if (y_top & 1) {
-    col[i] &= 0b11110011;
-    col[i] |= color << 2;
-    i++;
-  }
-  while (i < y_bot / 2) {
-    col[i] &= 0b11110000;
-    col[i] |= color << 2 | color << 0;
-    i++;
-  }
-  if (y_bot & 1) {
-    col[i] &= 0b11111100;
-    col[i] |= color << 0;
-  }
-}
-
-// Note: y_bot is exclusive.
 void draw_column_odd(uint8_t color, uint8_t *col, uint8_t y_top,
                      uint8_t y_bot) {
   uint8_t i = y_top / 2;
