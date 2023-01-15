@@ -300,10 +300,10 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     uint8_t *fb_col = &fb_next[pix_x_begin / 2 * 30];
     for (uint8_t pix_x = pix_x_begin; pix_x < pix_x_end; ++pix_x) {
       if (pix_x & 1) {
-        draw_column_odd(0, 1, 0, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
+        draw_column_odd(0, 3, 1, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
         fb_col += 30;
       } else {
-        draw_column_even(0, 1, 0, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
+        draw_column_even(0, 3, 1, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
       }
     }
   }
