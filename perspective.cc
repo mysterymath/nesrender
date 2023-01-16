@@ -246,6 +246,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       sy_bot = lcur_sy_bot * Log::pow2(13) + screen_height / 2 * 256;
     }
 
+    // TODO
+    if (cur_top_above_top || top_above_top || cur_top_below_bot ||
+        top_below_bot || cur_bot_above_top || cur_bot_below_bot ||
+        bot_above_top || bot_below_bot)
+      return;
+
     DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
           m_bot & 0xff);
 
