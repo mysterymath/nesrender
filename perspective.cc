@@ -271,10 +271,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           sx & 0xff, sy_top >> 8, sy_top & 0xff, sy_bot >> 8, sy_bot & 0xff,
           sx_right >> 8, sy_bot & 0xff);
 
-    // Top is inclusive, bot is exclusive.
-    uint8_t pix_y_tops[64];
-    uint8_t pix_y_bots[64];
-
     // Adjust to the next pixel center.
     int16_t offset = 128 - sx % 256;
     if (offset < 0)
@@ -289,24 +285,20 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     uint8_t pix_x_begin = sx / 256;
     uint8_t pix_x_end =
         sx_right % 256 <= 128 ? sx_right / 256 : sx_right / 256 + 1;
-    for (; sx < sx_right; sx += 256, sy_top += m_top, sy_bot += m_bot) {
-      uint8_t top_pix = sy_top / 256;
-      if (sy_top % 256 > 128)
-        ++top_pix;
-      uint8_t bot_pix = sy_bot / 256 + 1;
-      if (sy_bot % 256 <= 128)
-        --bot_pix;
-      pix_y_tops[sx / 256] = top_pix;
-      pix_y_bots[sx / 256] = bot_pix;
-    }
-
     uint8_t *fb_col = &fb_next[pix_x_begin / 2 * 30];
-    for (uint8_t pix_x = pix_x_begin; pix_x < pix_x_end; ++pix_x) {
+    for (uint8_t pix_x = pix_x_begin; pix_x < pix_x_end;
+         ++pix_x, sy_top += m_top, sy_bot += m_bot) {
+      uint8_t pix_top = sy_top / 256;
+      if (sy_top % 256 > 128)
+        ++pix_top;
+      uint8_t pix_bot = sy_bot / 256 + 1;
+      if (sy_bot % 256 <= 128)
+        --pix_bot;
       if (pix_x & 1) {
-        draw_column_odd(0, 3, 1, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
+        draw_column_odd(0, 3, 1, fb_col, pix_top, pix_bot);
         fb_col += 30;
       } else {
-        draw_column_even(0, 3, 1, fb_col, pix_y_tops[pix_x], pix_y_bots[pix_x]);
+        draw_column_even(0, 3, 1, fb_col, pix_top, pix_bot);
       }
     }
   }
