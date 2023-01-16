@@ -118,9 +118,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   Log lorig_cc_y_bot = lcc_y_bot;
   Log lorig_cc_w = lcc_w;
 
-  Log lsy_top = lcc_y_top / lcc_w;
-  Log lsy_bot = lcc_y_bot / lcc_w;
-
   bool left_of_left = cc_x < -cc_w;
   bool right_of_right = cc_x > cc_w;
 
@@ -142,6 +139,13 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
+    // Note that the logarithmic sx values range from [-1, 1], while the
+    // unsigned values range from [0, screen_width*256].
+
+    Log lcur_sx = lcur_cc_x / lcur_cc_w;
+    Log lsx = lcc_x / lcc_w;
+    uint16_t cur_sx;
+    uint16_t sx;
     if (cur_left_of_left || right_of_right) {
       int16_t dx = cc_x - cur_cc_x;
       int16_t dy_top = cc_y_top - cur_cc_y_top;
@@ -170,7 +174,12 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         cur_cc_y_bot += ldy_bot * t;
         cur_cc_w = -cur_cc_x;
         lcur_cc_w = cur_cc_w;
+        lcur_sx = -Log::one();
+        cur_sx = 0;
         DEBUG_CC("Clipped Cur", cur_cc);
+      } else {
+        lcur_sx = lcur_cc_x / lcur_cc_w;
+        cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
       }
       if (right_of_right) {
         DEBUG("Wall crosses right frustum edge. Clipping.\n");
@@ -180,18 +189,27 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         cc_x += ldx * t;
         lcc_x = cc_x;
         cc_y_top += ldy_top * t;
+        lcc_y_top = cc_y_top;
         cc_y_bot += ldy_bot * t;
-        // Note: No need to update lcc_y, as they're unused past this point.
+        lcc_y_bot = cc_y_bot;
         cc_w = cc_x;
         lcc_w = cc_w;
-        lsy_top = Log(cc_y_top) / lcc_w;
-        lsy_bot = Log(cc_y_bot) / lcc_w;
+        lsx = Log::one();
+        sx = screen_width * 256;
         DEBUG_CC("Clipped Next", cc);
+      } else {
+        lsx = lcc_x / lcc_w;
+        sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
       }
+    } else {
+      cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
+      sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
     }
 
     Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w;
     Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
+    Log lsy_top = lcc_y_top / lcc_w;
+    Log lsy_bot = lcc_y_bot / lcc_w;
 
     bool cur_bot_above_top = lcur_sy_bot < -lh_over_w;
     bool cur_top_below_bot = lcur_sy_top > lh_over_w;
@@ -208,12 +226,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
             cur_top_below_bot && bot_below_top);
       goto done;
     }
-
-    Log lcur_sx = lcur_cc_x / lcur_cc_w;
-    Log lsx = lcc_x / lcc_w;
-
-    uint16_t cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
-    uint16_t sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
 
     Log lm_top;
     int16_t m_top;

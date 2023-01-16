@@ -13,6 +13,7 @@ struct Log {
 
   static constexpr Log pow2(uint8_t k) { return Log(false, k << 11); }
   static constexpr Log zero() { return Log(false, -32768); }
+  static constexpr Log one() { return Log(false, 0); }
 
   operator int16_t() const;
 
