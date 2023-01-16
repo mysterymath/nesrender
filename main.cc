@@ -53,22 +53,27 @@ int main() {
       else if (pad & PAD_DOWN)
         overhead::scale_down();
     } else {
-      if (pad & PAD_UP)
-        player.forward();
-      else if (pad & PAD_DOWN)
-        player.backward();
       if (pad & PAD_A) {
+        if (pad & PAD_UP)
+          player.z += 2;
+        else if (pad & PAD_DOWN)
+          player.z -= 2;
         if (pad & PAD_LEFT)
           player.strafe_left();
         else if (pad & PAD_RIGHT)
           player.strafe_right();
       } else {
+        if (pad & PAD_UP)
+          player.forward();
+        else if (pad & PAD_DOWN)
+          player.backward();
         if (pad & PAD_LEFT)
           player.turn_left();
         else if (pad & PAD_RIGHT)
           player.turn_right();
       }
     }
+#if 0
     if (!overhead_view && pad_t & PAD_B && player.z == 50)
       player.dz = 8;
     player.z += player.dz;
@@ -77,6 +82,7 @@ int main() {
       player.z = 50;
       player.dz = 0;
     }
+#endif
 
     if (!still_presenting) {
       if (overhead_view)

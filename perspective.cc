@@ -264,7 +264,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           // cur_y + dyt = -cur_w - dw*t;
           // t*(dy + dw) = -cur_w - cur_y
           // t = (-cur_w - cur_y) / (dy + dw)
-          Log t = Log(-cur_cc_w - cur_cc_x) / Log(dy_top + dw);
+          Log t = Log(-cur_cc_w - cur_cc_y_top) / Log(dy_top + dw);
           int16_t isect_cc_x = cur_cc_x + ldx * t;
           int16_t isect_cc_y_top = cur_cc_y_top + ldy_top * t;
           int16_t isect_cc_y_bot = cur_cc_y_bot + ldy_bot * t;
@@ -275,7 +275,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           Log lisect_cc_y_bot = isect_cc_y_bot;
           Log lisect_cc_w = isect_cc_w;
           Log lisect_sx = lisect_cc_x / lisect_cc_w;
-          Log lisect_sy_bot = isect_cc_y_bot / lisect_cc_w;
+          Log lisect_sy_bot = lisect_cc_y_bot / lisect_cc_w;
           uint16_t isect_sx =
               lisect_sx * Log::pow2(13) + screen_width / 2 * 256;
           if (cur_top_above_top) {
