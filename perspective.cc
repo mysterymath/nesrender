@@ -212,38 +212,38 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lcur_sx = lcur_cc_x / lcur_cc_w;
     Log lsx = lcc_x / lcc_w;
 
-    uint16_t sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
-    uint16_t sx_right = lsx * Log::pow2(13) + screen_width / 2 * 256;
+    uint16_t cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
+    uint16_t sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
 
     Log lm_top;
     int16_t m_top;
     Log lm_bot;
     int16_t m_bot;
-    uint16_t sy_top;
-    uint16_t sy_bot;
+    uint16_t cur_sy_top;
+    uint16_t cur_sy_bot;
     Log iscale = Log::pow2(13);
     Log m_denom = lsx * iscale - lcur_sx * iscale;
     if (cur_top_above_top && top_above_top) {
       lm_top = Log::zero();
       m_top = 0;
-      sy_top = 0;
+      cur_sy_top = 0;
       cur_top_above_top = top_above_top = false;
       DEBUG("Clipped top.\n");
     } else {
       lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom;
       m_top = lm_top * Log::pow2(8);
-      sy_top = lcur_sy_top * Log::pow2(13) + screen_height / 2 * 256;
+      cur_sy_top = lcur_sy_top * Log::pow2(13) + screen_height / 2 * 256;
     }
     if (cur_bot_below_bot && bot_below_bot) {
       lm_bot = Log::zero();
       m_bot = 0;
-      sy_bot = screen_height * 256;
+      cur_sy_bot = screen_height * 256;
       cur_bot_below_bot = bot_below_bot = false;
       DEBUG("Clipped bot.\n");
     } else {
       lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
       m_bot = lm_bot * Log::pow2(8);
-      sy_bot = lcur_sy_bot * Log::pow2(13) + screen_height / 2 * 256;
+      cur_sy_bot = lcur_sy_bot * Log::pow2(13) + screen_height / 2 * 256;
     }
 
     // TODO
@@ -255,39 +255,24 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
           m_bot & 0xff);
 
-#if 0
-    uint8_t sy_top[64];
-    uint8_t sy_bot[64];
-    int16_t sx = (int32_t)cur_cc_x * screen_width * 256 / cur_cc_w;
-    int16_t sy_top, sy_bot;
-    bool cur_top_on_screen = !cur_top_above_top && !cur_top_below_bot;
-    bool cur_bot_on_screen = !cur_bot_above_top && !cur_bot_below_bot;
-    if (cur_top_on_screen || cur_bot_on_screen) {
-      if (cur_top_on_screen)
-        sy_top = (int32_t)cur_cc_y_top * screen_width * 256 / cur_cc_w;
-      if (cur_bot_on_screen)
-        sy_bot = (int32_t)cur_cc_y_bot * screen_width * 256 / cur_cc_w;
-    }
-#endif
-
-    DEBUG("sx: %u:%u, sy_top: %u:%u, sy_bot: %u:%u, sx_right: %u:%u\n", sx >> 8,
-          sx & 0xff, sy_top >> 8, sy_top & 0xff, sy_bot >> 8, sy_bot & 0xff,
-          sx_right >> 8, sy_bot & 0xff);
+    DEBUG("cur_sx: %u:%u, cur_sy_top: %u:%u, cur_sy_bot: %u:%u, sx: %u:%u\n",
+          cur_sx >> 8, cur_sx & 0xff, cur_sy_top >> 8, cur_sy_top & 0xff,
+          cur_sy_bot >> 8, cur_sy_bot & 0xff, sx >> 8, sx & 0xff);
 
     // Adjust to the next pixel center.
     int16_t offset = 128 - sx % 256;
     if (offset < 0)
       offset += 256;
     if (offset) {
-      sx += offset;
+      cur_sx += offset;
       Log loffset = Log(offset);
-      sy_top += lm_top * loffset;
-      sy_bot += lm_bot * loffset;
+      cur_sy_top += lm_top * loffset;
+      cur_sy_bot += lm_bot * loffset;
     }
 
-    uint8_t cur_px = sx / 256;
-    uint8_t px = sx_right % 256 <= 128 ? sx_right / 256 : sx_right / 256 + 1;
-    draw_wall(cur_px, sy_top, m_top, sy_bot, m_bot, px);
+    uint8_t cur_px = cur_sx / 256;
+    uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
+    draw_wall(cur_px, cur_sy_top, m_top, cur_sy_bot, m_bot, px);
   }
 
 done:
