@@ -89,6 +89,9 @@ void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
                      uint8_t y_bot);
 }
 
+void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
+               uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
+
 __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
 
@@ -282,25 +285,9 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       sy_bot += lm_bot * loffset;
     }
 
-    uint8_t pix_x_begin = sx / 256;
-    uint8_t pix_x_end =
-        sx_right % 256 <= 128 ? sx_right / 256 : sx_right / 256 + 1;
-    uint8_t *fb_col = &fb_next[pix_x_begin / 2 * 30];
-    for (uint8_t pix_x = pix_x_begin; pix_x < pix_x_end;
-         ++pix_x, sy_top += m_top, sy_bot += m_bot) {
-      uint8_t pix_top = sy_top / 256;
-      if (sy_top % 256 > 128)
-        ++pix_top;
-      uint8_t pix_bot = sy_bot / 256 + 1;
-      if (sy_bot % 256 <= 128)
-        --pix_bot;
-      if (pix_x & 1) {
-        draw_column_odd(0, 3, 1, fb_col, pix_top, pix_bot);
-        fb_col += 30;
-      } else {
-        draw_column_even(0, 3, 1, fb_col, pix_top, pix_bot);
-      }
-    }
+    uint8_t cur_px = sx / 256;
+    uint8_t px = sx_right % 256 <= 128 ? sx_right / 256 : sx_right / 256 + 1;
+    draw_wall(cur_px, sy_top, m_top, sy_bot, m_bot, px);
   }
 
 done:
@@ -314,6 +301,25 @@ done:
   lcur_cc_w = lorig_cc_w;
   cur_left_of_left = left_of_left;
   cur_right_of_right = right_of_right;
+}
+
+void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
+               uint16_t cur_sy_bot, int16_t m_bot, uint8_t px) {
+  uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
+  for (; cur_px < px; ++cur_px, cur_sy_top += m_top, cur_sy_bot += m_bot) {
+    uint8_t cur_py_top = cur_sy_top / 256;
+    if (cur_sy_top % 256 > 128)
+      ++cur_py_top;
+    uint8_t cur_py_bot = cur_sy_bot / 256 + 1;
+    if (cur_sy_bot % 256 <= 128)
+      --cur_py_bot;
+    if (cur_px & 1) {
+      draw_column_odd(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
+      fb_col += 30;
+    } else {
+      draw_column_even(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
+    }
+  }
 }
 
 // Note: y_bot is exclusive.
