@@ -46,10 +46,6 @@ static Log lcur_cc_w;
 
 static bool cur_left_of_left;
 static bool cur_right_of_right;
-static bool cur_bot_above_top;
-static bool cur_top_below_bot;
-static bool cur_top_above_top;
-static bool cur_bot_below_bot;
 
 constexpr int16_t wall_top_z = 80;
 constexpr int16_t wall_bot_z = 20;
@@ -75,14 +71,6 @@ static void move_to(uint16_t x, uint16_t y) {
 
   cur_left_of_left = cur_cc_x < -cur_cc_w;
   cur_right_of_right = cur_cc_x > cur_cc_w;
-
-  Log cur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
-  Log cur_sy_top = lcur_cc_y_top / lcur_cc_w;
-
-  cur_bot_above_top = cur_sy_bot < -lh_over_w;
-  cur_top_below_bot = cur_sy_top > lh_over_w;
-  cur_top_above_top = cur_sy_top < -lh_over_w;
-  cur_bot_below_bot = cur_sy_bot > lh_over_w;
 }
 
 void left_edge(int32_t *begin, int32_t *delta);
@@ -132,10 +120,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
   bool left_of_left = cc_x < -cc_w;
   bool right_of_right = cc_x > cc_w;
-  bool bot_above_top = lsy_bot < -lh_over_w;
-  bool top_below_bot = lsy_top > lh_over_w;
-  bool top_above_top = lsy_top < -lh_over_w;
-  bool bot_below_bot = lsy_bot > lh_over_w;
 
   // There is homogeneous weirdness when both w are zero. Disallow.
   if (cc_w <= 0 && cur_cc_w <= 0)
@@ -143,13 +127,9 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
   {
     if (cur_left_of_left && left_of_left ||
-        cur_right_of_right && right_of_right ||
-        cur_bot_above_top && bot_above_top ||
-        cur_top_below_bot && top_below_bot) {
-      DEBUG("Frustum cull: %d %d %d %d\n", cur_left_of_left && left_of_left,
-            cur_right_of_right && right_of_right,
-            cur_bot_above_top && bot_above_top,
-            cur_top_below_bot && top_below_bot);
+        cur_right_of_right && right_of_right) {
+      DEBUG("LR frustum cull: %d %d\n", cur_left_of_left && left_of_left,
+            cur_right_of_right && right_of_right);
       goto done;
     }
 
@@ -207,10 +187,27 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       }
     }
 
-    Log lcur_sx = lcur_cc_x / lcur_cc_w;
-    Log lsx = lcc_x / lcc_w;
     Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w;
     Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
+
+    bool cur_bot_above_top = lcur_sy_bot < -lh_over_w;
+    bool cur_top_below_bot = lcur_sy_top > lh_over_w;
+    bool cur_top_above_top = lcur_sy_top < -lh_over_w;
+    bool cur_bot_below_bot = lcur_sy_bot > lh_over_w;
+    bool bot_above_top = lsy_bot < -lh_over_w;
+    bool top_below_bot = lsy_top > lh_over_w;
+    bool top_above_top = lsy_top < -lh_over_w;
+    bool bot_below_bot = lsy_bot > lh_over_w;
+
+    if (cur_bot_above_top && bot_above_top ||
+        cur_top_below_bot && top_below_bot) {
+      DEBUG("TB Frustum Cull: %d %d\n", cur_bot_above_top && bot_above_top,
+            cur_top_below_bot && bot_below_top);
+      goto done;
+    }
+
+    Log lcur_sx = lcur_cc_x / lcur_cc_w;
+    Log lsx = lcc_x / lcc_w;
 
     uint16_t sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
     uint16_t sx_right = lsx * Log::pow2(13) + screen_width / 2 * 256;
@@ -325,10 +322,6 @@ done:
   lcur_cc_w = lorig_cc_w;
   cur_left_of_left = left_of_left;
   cur_right_of_right = right_of_right;
-  cur_bot_above_top = bot_above_top;
-  cur_top_below_bot = top_below_bot;
-  cur_top_above_top = top_above_top;
-  cur_bot_below_bot = bot_below_bot;
 }
 
 // Note: y_bot is exclusive.
