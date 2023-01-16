@@ -54,8 +54,11 @@ constexpr int16_t wall_bot_z = 20;
   DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
         NAME##_w)
 
-// 60/64
-constexpr Log lh_over_w(false, -191);
+// 64/60
+constexpr Log lw_over_h(false, 191);
+
+// 60/2*256
+constexpr Log lh_over_2_times_256(false, 26433);
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
@@ -73,13 +76,6 @@ static void move_to(uint16_t x, uint16_t y) {
   cur_right_of_right = cur_cc_x > cur_cc_w;
 }
 
-void left_edge(int32_t *begin, int32_t *delta);
-void right_edge(int16_t x, int16_t w, int32_t *begin, int32_t *delta);
-void top_edge(int16_t x, int16_t y_top, int16_t w, int32_t *begin, int32_t *dx,
-              int32_t *dy, int32_t *nextcol);
-void bot_edge(int16_t x, int16_t y_bot, int16_t w, int32_t *begin, int32_t *dx,
-              int32_t *dy, int32_t *nextcol);
-
 extern "C" {
 void draw_column_even(uint8_t ceil_color, uint8_t wall_color,
                       uint8_t floor_color, uint8_t *col, uint8_t y_top,
@@ -89,8 +85,11 @@ void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
                      uint8_t y_bot);
 }
 
-void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
-               uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
+static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
+                              Log lm_top, int16_t m_top, Log lcur_sy_bot,
+                              Log lsx, uint16_t sx, Log lsy_bot,
+                              bool cur_bot_below_bot, bool bot_below_bot,
+                              bool cur_bot_above_top, bool bot_above_top);
 
 __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
@@ -206,19 +205,22 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
     }
 
+    bool cur_bot_above_top = cur_cc_y_bot < -cur_cc_w;
+    bool cur_top_below_bot = cur_cc_y_top > cur_cc_w;
+    bool cur_top_above_top = cur_cc_y_top < -cur_cc_w;
+    bool cur_bot_below_bot = cur_cc_y_bot > cur_cc_w;
+    bool bot_above_top = cc_y_bot < -cc_w;
+    bool top_below_bot = cc_y_top > cc_w;
+    bool top_above_top = cc_y_top < -cc_w;
+    bool bot_below_bot = cc_y_bot > cc_w;
+
+    // Note that lsy ranges from -1 to 1, while sy ranges from 0 to
+    // screen_height.
+
     Log lcur_sy_top = lcur_cc_y_top / lcur_cc_w;
     Log lcur_sy_bot = lcur_cc_y_bot / lcur_cc_w;
     Log lsy_top = lcc_y_top / lcc_w;
     Log lsy_bot = lcc_y_bot / lcc_w;
-
-    bool cur_bot_above_top = lcur_sy_bot < -lh_over_w;
-    bool cur_top_below_bot = lcur_sy_top > lh_over_w;
-    bool cur_top_above_top = lcur_sy_top < -lh_over_w;
-    bool cur_bot_below_bot = lcur_sy_bot > lh_over_w;
-    bool bot_above_top = lsy_bot < -lh_over_w;
-    bool top_below_bot = lsy_top > lh_over_w;
-    bool top_above_top = lsy_top < -lh_over_w;
-    bool bot_below_bot = lsy_bot > lh_over_w;
 
     if (cur_bot_above_top && bot_above_top ||
         cur_top_below_bot && top_below_bot) {
@@ -229,10 +231,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
     Log lm_top;
     int16_t m_top;
-    Log lm_bot;
-    int16_t m_bot;
     uint16_t cur_sy_top;
-    uint16_t cur_sy_bot;
     Log iscale = Log::pow2(13);
     Log m_denom = lsx * iscale - lcur_sx * iscale;
     if (cur_top_above_top && top_above_top) {
@@ -240,51 +239,19 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       m_top = 0;
       cur_sy_top = 0;
       cur_top_above_top = top_above_top = false;
-      DEBUG("Clipped top.\n");
+      DEBUG("Clipped top: both sides.\n");
+    } else if (cur_top_above_top || top_above_top) {
+      // TODO
+    } else if (cur_top_below_bot || top_below_bot) {
+      // TODO
     } else {
       lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom;
       m_top = lm_top * Log::pow2(8);
-      cur_sy_top = lcur_sy_top * Log::pow2(13) + screen_height / 2 * 256;
+      cur_sy_top = lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
+      clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top, lcur_sy_bot,
+                        lsx, sx, lsy_bot, cur_bot_below_bot, bot_below_bot,
+                        cur_bot_above_top, bot_above_top);
     }
-    if (cur_bot_below_bot && bot_below_bot) {
-      lm_bot = Log::zero();
-      m_bot = 0;
-      cur_sy_bot = screen_height * 256;
-      cur_bot_below_bot = bot_below_bot = false;
-      DEBUG("Clipped bot.\n");
-    } else {
-      lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
-      m_bot = lm_bot * Log::pow2(8);
-      cur_sy_bot = lcur_sy_bot * Log::pow2(13) + screen_height / 2 * 256;
-    }
-
-    // TODO
-    if (cur_top_above_top || top_above_top || cur_top_below_bot ||
-        top_below_bot || cur_bot_above_top || cur_bot_below_bot ||
-        bot_above_top || bot_below_bot)
-      return;
-
-    DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
-          m_bot & 0xff);
-
-    DEBUG("cur_sx: %u:%u, cur_sy_top: %u:%u, cur_sy_bot: %u:%u, sx: %u:%u\n",
-          cur_sx >> 8, cur_sx & 0xff, cur_sy_top >> 8, cur_sy_top & 0xff,
-          cur_sy_bot >> 8, cur_sy_bot & 0xff, sx >> 8, sx & 0xff);
-
-    // Adjust to the next pixel center.
-    int16_t offset = 128 - sx % 256;
-    if (offset < 0)
-      offset += 256;
-    if (offset) {
-      cur_sx += offset;
-      Log loffset = Log(offset);
-      cur_sy_top += lm_top * loffset;
-      cur_sy_bot += lm_bot * loffset;
-    }
-
-    uint8_t cur_px = cur_sx / 256;
-    uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
-    draw_wall(cur_px, cur_sy_top, m_top, cur_sy_bot, m_bot, px);
   }
 
 done:
@@ -300,8 +267,72 @@ done:
   cur_right_of_right = right_of_right;
 }
 
-void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
-               uint16_t cur_sy_bot, int16_t m_bot, uint8_t px) {
+static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
+                                     Log lm_top, int16_t m_top,
+                                     uint16_t cur_sy_bot, Log lm_bot,
+                                     int16_t m_bot, uint16_t sx);
+
+static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
+                              Log lm_top, int16_t m_top, Log lcur_sy_bot,
+                              Log lsx, uint16_t sx, Log lsy_bot,
+                              bool cur_bot_below_bot, bool bot_below_bot,
+                              bool cur_bot_above_top, bool bot_above_top) {
+  Log lm_bot;
+  int16_t m_bot;
+  uint16_t cur_sy_bot;
+  Log iscale = Log::pow2(13);
+  Log m_denom = lsx * iscale - lcur_sx * iscale;
+  if (cur_bot_below_bot && bot_below_bot) {
+    lm_bot = Log::zero();
+    m_bot = 0;
+    cur_sy_bot = screen_height * 256;
+    cur_bot_below_bot = bot_below_bot = false;
+    DEBUG("Clipped bot: both sides.\n");
+  } else if (cur_bot_below_bot || bot_below_bot) {
+    // TODO
+  } else if (cur_bot_above_top || bot_above_top) {
+    // TODO
+  } else {
+    lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
+    m_bot = lm_bot * Log::pow2(8);
+    cur_sy_bot = lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
+    draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top, cur_sy_bot,
+                             lm_bot, m_bot, sx);
+  }
+}
+
+static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
+                      uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
+
+static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
+                                     Log lm_top, int16_t m_top,
+                                     uint16_t cur_sy_bot, Log lm_bot,
+                                     int16_t m_bot, uint16_t sx) {
+  DEBUG("m_top: %d:%d, m_bot: %d:%d\n", m_top >> 8, m_top & 0xff, m_bot >> 8,
+        m_bot & 0xff);
+
+  DEBUG("cur_sx: %u:%u, cur_sy_top: %u:%u, cur_sy_bot: %u:%u, sx: %u:%u\n",
+        cur_sx >> 8, cur_sx & 0xff, cur_sy_top >> 8, cur_sy_top & 0xff,
+        cur_sy_bot >> 8, cur_sy_bot & 0xff, sx >> 8, sx & 0xff);
+
+  // Adjust to the next pixel center.
+  int16_t offset = 128 - sx % 256;
+  if (offset < 0)
+    offset += 256;
+  if (offset) {
+    cur_sx += offset;
+    Log loffset = Log(offset);
+    cur_sy_top += lm_top * loffset;
+    cur_sy_bot += lm_bot * loffset;
+  }
+
+  uint8_t cur_px = cur_sx / 256;
+  uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
+  draw_wall(cur_px, cur_sy_top, m_top, cur_sy_bot, m_bot, px);
+}
+
+static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
+                      uint16_t cur_sy_bot, int16_t m_bot, uint8_t px) {
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
   for (; cur_px < px; ++cur_px, cur_sy_top += m_top, cur_sy_bot += m_bot) {
     uint8_t cur_py_top = cur_sy_top / 256;
@@ -406,4 +437,8 @@ static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
   *cc_w = vx;
 }
 
-static void z_to_cc(uint16_t z, int16_t *cc_y) { *cc_y = player.z - z; }
+static void z_to_cc(uint16_t z, int16_t *cc_y) {
+  // The horizontal frustum is x = +-w, and we'd like the vertical frustum to be
+  // y = +-w, instead of y = +-ht/wt*w. Accordingly, scale here by wt/ht.
+  *cc_y = Log(player.z - z) * lw_over_h;
+}
