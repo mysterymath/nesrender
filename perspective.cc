@@ -344,8 +344,9 @@ static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
     lm_bot = Log::zero();
     m_bot = 0;
     cur_sy_bot = screen_height * 256;
-    cur_bot_below_bot = bot_below_bot = false;
     DEBUG("Clipped bot: both sides.\n");
+    draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top, cur_sy_bot,
+                             lm_bot, m_bot, sx);
   } else if (cur_bot_below_bot || bot_below_bot) {
     // TODO
   } else if (cur_bot_above_top || bot_above_top) {
