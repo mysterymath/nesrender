@@ -328,23 +328,33 @@ static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
 static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
                               Log lm_top, int16_t m_top, Log lcur_sy_bot,
                               Log lsx, uint16_t sx, Log lsy_bot) {
-  Log lm_bot;
-  int16_t m_bot;
-  uint16_t cur_sy_bot;
-  Log iscale = Log::pow2(13);
-  Log m_denom = lsx * iscale - lcur_sx * iscale;
   if (lcur_sy_bot > Log::one() && lsy_bot > Log::one()) {
     DEBUG("Clipped bot: both sides.\n");
     draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top,
                              screen_height * 256, Log::zero(), 0, sx);
-  } else if (lcur_sy_bot.abs() <= Log::one()) {
-    lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
-    m_bot = lm_bot * Log::pow2(8);
-    cur_sy_bot = lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
-    draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top, cur_sy_bot,
-                             lm_bot, m_bot, sx);
   } else {
-    DEBUG("TODO: Clip bot.\n");
+    Log iscale = Log::pow2(13);
+    Log m_denom = lsx * iscale - lcur_sx * iscale;
+    Log lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
+    int16_t m_bot = lm_bot * Log::pow2(8);
+    uint16_t cur_sy_bot =
+        lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
+    if (lcur_sy_bot.abs() <= Log::one()) {
+      draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top, cur_sy_bot,
+                               lm_bot, m_bot, sx);
+    } else {
+      // lsy_bot + lm_bot * ldx = -1
+      // ldx = (-1 - lsy_bot) / lm_bot
+      Log ldx = Log(-8192 - lsy_bot * Log::pow2(13)) / lm_bot / Log::pow2(13);
+      uint16_t isect_sx = sx + ldx * Log::pow2(13);
+      uint16_t isect_sy_top = cur_sy_top + Log(isect_sx - cur_sx) * lm_top;
+      printf("%d %d %d %d %d %d %d\n", lsy_bot.exp, lm_bot.exp, ldx.exp, sx,
+             isect_sx, cur_sy_top, isect_sy_top);
+      draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top,
+                               screen_height * 256, Log::zero(), 0, isect_sx);
+      draw_after_fully_clipped(isect_sx, isect_sy_top, lm_top, m_top,
+                               cur_sy_bot, lm_bot, m_bot, sx);
+    }
   }
 }
 
