@@ -16,6 +16,7 @@ struct Log {
   static constexpr Log one() { return Log(false, 0); }
 
   operator int16_t() const;
+  constexpr Log abs() const { return Log(false, exp); }
 
   Log operator-() const;
   Log operator*(const Log &other) const;

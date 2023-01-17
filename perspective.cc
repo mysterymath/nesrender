@@ -86,9 +86,7 @@ static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
 
 static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
                               Log lm_top, int16_t m_top, Log lcur_sy_bot,
-                              Log lsx, uint16_t sx, Log lsy_bot,
-                              bool cur_bot_below_bot, bool bot_below_bot,
-                              bool cur_bot_above_top, bool bot_above_top);
+                              Log lsx, uint16_t sx, Log lsy_bot);
 
 __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
@@ -204,15 +202,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
     }
 
-    bool cur_bot_above_top = cur_cc_y_bot < -cur_cc_w;
-    bool cur_top_below_bot = cur_cc_y_top > cur_cc_w;
-    bool cur_top_above_top = cur_cc_y_top < -cur_cc_w;
-    bool cur_bot_below_bot = cur_cc_y_bot > cur_cc_w;
-    bool bot_above_top = cc_y_bot < -cc_w;
-    bool top_below_bot = cc_y_top > cc_w;
-    bool top_above_top = cc_y_top < -cc_w;
-    bool bot_below_bot = cc_y_bot > cc_w;
-
     // Note that lsy ranges from -1 to 1, while sy ranges from 0 to
     // screen_height.
 
@@ -221,7 +210,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lsy_top = lcc_y_top / lcc_w;
     Log lsy_bot = lcc_y_bot / lcc_w;
 
-    if (cur_top_below_bot && top_below_bot) {
+    if (lcur_sy_top > Log::one() && lsy_top > Log::one()) {
       DEBUG("Top frustum cull.\n");
       uint8_t cur_px = cur_sx / 256;
       uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
@@ -229,7 +218,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
-    if (cur_bot_above_top && bot_above_top) {
+    if (lcur_sy_bot < -Log::one() && lsy_bot < -Log::one()) {
       DEBUG("Bot frustum cull.\n");
       uint8_t cur_px = cur_sx / 256;
       uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
@@ -237,25 +226,23 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
-    if (cur_top_above_top && top_above_top) {
+    if (lcur_sy_top < -Log::one() && lsy_top < -Log::one()) {
       Log lm_top = Log::zero();
       int16_t m_top = 0;
       uint16_t cur_sy_top = 0;
       DEBUG("Clipped top: both sides.\n");
       clip_bot_and_draw(lcur_sx, cur_sx, 0, Log::zero(), 0, lcur_sy_bot, lsx,
-                        sx, lsy_bot, cur_bot_below_bot, bot_below_bot,
-                        cur_bot_above_top, bot_above_top);
+                        sx, lsy_bot);
     } else {
       Log iscale = Log::pow2(13);
       Log lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) /
                    Log(lsx * iscale - lcur_sx * iscale);
       int16_t m_top = lm_top * Log::pow2(8);
-      if (!cur_top_above_top && !cur_top_below_bot) {
+      if (lcur_sy_top.abs() <= Log::one()) {
         uint16_t cur_sy_top =
             lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
         clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top,
-                          lcur_sy_bot, lsx, sx, lsy_bot, cur_bot_below_bot,
-                          bot_below_bot, cur_bot_above_top, bot_above_top);
+                          lcur_sy_bot, lsx, sx, lsy_bot);
       } else {
         int16_t dx = cc_x - cur_cc_x;
         int16_t dy_top = cc_y_top - cur_cc_y_top;
@@ -266,7 +253,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         Log ldy_bot = dy_bot;
         Log ldw = dw;
 
-        if (cur_top_above_top) {
+        if (lcur_sy_top < -Log::one()) {
           // r(t) = cur + vt
           // r(t)_y = -r(t)_w
           // cur_y + dyt = -cur_w - dw*t;
@@ -277,8 +264,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           int16_t isect_cc_y_top = cur_cc_y_top + ldy_top * t;
           int16_t isect_cc_y_bot = cur_cc_y_bot + ldy_bot * t;
           int16_t isect_cc_w = -isect_cc_y_top;
-          bool isect_bot_below_bot = isect_cc_y_bot > isect_cc_w;
-          bool isect_bot_above_top = isect_cc_y_bot < -isect_cc_w;
           Log lisect_cc_x = isect_cc_x;
           Log lisect_cc_y_bot = isect_cc_y_bot;
           Log lisect_cc_w = isect_cc_w;
@@ -288,13 +273,9 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
               lisect_sx * Log::pow2(13) + screen_width / 2 * 256;
           DEBUG("Clipped top left to top\n");
           clip_bot_and_draw(lcur_sx, cur_sx, 0, Log::zero(), 0, lcur_sy_bot,
-                            lisect_sx, isect_sx, lisect_sy_bot,
-                            cur_bot_below_bot, isect_bot_below_bot,
-                            cur_bot_above_top, isect_bot_above_top);
+                            lisect_sx, isect_sx, lisect_sy_bot);
           clip_bot_and_draw(lisect_sx, isect_sx, 0, lm_top, m_top,
-                            lisect_sy_bot, lsx, sx, lsy_bot,
-                            isect_bot_below_bot, bot_below_bot,
-                            isect_bot_above_top, bot_above_top);
+                            lisect_sy_bot, lsx, sx, lsy_bot);
         } else {
           // r(t) = cur + vt
           // r(t)_y = r(t)_w
@@ -306,8 +287,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           int16_t isect_cc_y_top = cur_cc_y_top + ldy_top * t;
           int16_t isect_cc_y_bot = cur_cc_y_bot + ldy_bot * t;
           int16_t isect_cc_w = isect_cc_y_top;
-          bool isect_bot_below_bot = isect_cc_y_bot > isect_cc_w;
-          bool isect_bot_above_top = isect_cc_y_bot < -isect_cc_w;
           Log lisect_cc_x = isect_cc_x;
           Log lisect_cc_y_bot = isect_cc_y_bot;
           Log lisect_cc_w = isect_cc_w;
@@ -322,9 +301,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           draw_wall(cur_px, screen_height * 256, 0, screen_height * 256, 0,
                     isect_px);
           clip_bot_and_draw(lisect_sx, isect_sx, screen_height * 256, lm_top,
-                            m_top, lcur_sy_bot, lsx, sx, lsy_bot,
-                            isect_bot_below_bot, bot_below_bot,
-                            isect_bot_above_top, bot_above_top);
+                            m_top, lcur_sy_bot, lsx, sx, lsy_bot);
         }
       }
     }
@@ -350,31 +327,24 @@ static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
 
 static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
                               Log lm_top, int16_t m_top, Log lcur_sy_bot,
-                              Log lsx, uint16_t sx, Log lsy_bot,
-                              bool cur_bot_below_bot, bool bot_below_bot,
-                              bool cur_bot_above_top, bool bot_above_top) {
+                              Log lsx, uint16_t sx, Log lsy_bot) {
   Log lm_bot;
   int16_t m_bot;
   uint16_t cur_sy_bot;
   Log iscale = Log::pow2(13);
   Log m_denom = lsx * iscale - lcur_sx * iscale;
-  if (cur_bot_below_bot && bot_below_bot) {
-    lm_bot = Log::zero();
-    m_bot = 0;
-    cur_sy_bot = screen_height * 256;
+  if (lcur_sy_bot > Log::one() && lsy_bot > Log::one()) {
     DEBUG("Clipped bot: both sides.\n");
-    draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top, cur_sy_bot,
-                             lm_bot, m_bot, sx);
-  } else if (cur_bot_below_bot || bot_below_bot) {
-    DEBUG("TODO: Bot below bot\n");
-  } else if (cur_bot_above_top || bot_above_top) {
-    DEBUG("TODO: Bot above top\n");
-  } else {
+    draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top,
+                             screen_height * 256, Log::zero(), 0, sx);
+  } else if (lcur_sy_bot.abs() <= Log::one()) {
     lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / m_denom;
     m_bot = lm_bot * Log::pow2(8);
     cur_sy_bot = lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
     draw_after_fully_clipped(cur_sx, cur_sy_top, lm_top, m_top, cur_sy_bot,
                              lm_bot, m_bot, sx);
+  } else {
+    DEBUG("TODO: Clip bot.\n");
   }
 }
 
