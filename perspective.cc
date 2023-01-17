@@ -77,14 +77,9 @@ static void move_to(uint16_t x, uint16_t y) {
   cur_right_of_right = cur_cc_x > cur_cc_w;
 }
 
-extern "C" {
-void draw_column_even(uint8_t ceil_color, uint8_t wall_color,
-                      uint8_t floor_color, uint8_t *col, uint8_t y_top,
-                      uint8_t y_bot);
-void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
-                     uint8_t floor_color, uint8_t *col, uint8_t y_top,
-                     uint8_t y_bot);
-}
+template <bool is_odd>
+void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
+                 uint8_t *col, uint8_t y_top, uint8_t y_bot);
 
 static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
                       uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
@@ -444,10 +439,10 @@ static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
     if (cur_sy_bot % 256 <= 128)
       --cur_py_bot;
     if (cur_px & 1) {
-      draw_column_odd(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
+      draw_column<true>(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
       fb_col += 30;
     } else {
-      draw_column_even(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
+      draw_column<false>(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
     }
     if (!top_off_screen) {
       if (m_top < 0 && cur_sy_top < -m_top) {
@@ -477,80 +472,70 @@ static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
 }
 
 // Note: y_bot is exclusive.
-void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
-                     uint8_t floor_color, uint8_t *col, uint8_t y_top,
-                     uint8_t y_bot) {
+template <bool is_odd>
+void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
+                 uint8_t *col, uint8_t y_top, uint8_t y_bot) {
   uint8_t i;
   if (!ceil_color) {
     i = y_top / 2;
   } else {
     for (i = 0; i < y_top / 2; i++) {
-      col[i] &= 0b00001111;
-      col[i] &= ceil_color << 6 | ceil_color << 4;
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] &= ceil_color << 6 | ceil_color << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] &= ceil_color << 2 | ceil_color;
+      }
     }
   }
-  if (y_top & 1) {
-    col[i] &= 0b00001111;
-    col[i] |= wall_color << 6 | ceil_color << 4;
+  if (i == screen_height / 2)
+    return;
+  if (y_bot != y_top && y_top & 1) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= wall_color << 6 | ceil_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= wall_color << 2 | ceil_color;
+    }
     i++;
   }
   if (!wall_color) {
     i = y_bot / 2;
   } else {
     for (; i < y_bot / 2; i++) {
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] |= wall_color << 6 | wall_color << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] |= wall_color << 2 | wall_color;
+      }
+    }
+  }
+  if (i == screen_height / 2)
+    return;
+  if (y_bot != y_top && y_bot & 1) {
+    if (is_odd) {
       col[i] &= 0b00001111;
-      col[i] |= wall_color << 6 | wall_color << 4;
+      col[i] |= floor_color << 6 | wall_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= floor_color << 2 | wall_color;
     }
-  }
-  if (y_bot & 1) {
-    col[i] &= 0b00001111;
-    col[i] |= floor_color << 6 | wall_color << 4;
     i++;
   }
   if (!floor_color)
     return;
   for (; i < screen_height / 2; i++) {
-    col[i] &= 0b00001111;
-    col[i] |= floor_color << 6 | floor_color << 4;
-  }
-}
-
-// Note: y_bot is exclusive.
-void draw_column_even(uint8_t ceil_color, uint8_t wall_color,
-                      uint8_t floor_color, uint8_t *col, uint8_t y_top,
-                      uint8_t y_bot) {
-  uint8_t i;
-  if (!ceil_color) {
-    i = y_top / 2;
-  } else {
-    for (i = 0; i < y_top / 2; i++) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= floor_color << 6 | floor_color << 4;
+    } else {
       col[i] &= 0b11110000;
-      col[i] &= ceil_color << 2 | ceil_color;
+      col[i] |= floor_color << 2 | floor_color;
     }
-  }
-  if (y_top & 1) {
-    col[i] &= 0b11110000;
-    col[i] |= wall_color << 2 | ceil_color;
-    i++;
-  }
-  if (!wall_color) {
-    i = y_bot / 2;
-  } else {
-    for (; i < y_bot / 2; i++) {
-      col[i] &= 0b11110000;
-      col[i] |= wall_color << 2 | wall_color;
-    }
-  }
-  if (y_bot & 1) {
-    col[i] &= 0b11110000;
-    col[i] |= floor_color << 2 | wall_color;
-    i++;
-  }
-  if (!floor_color)
-    return;
-  for (; i < screen_height / 2; i++) {
-    col[i] &= 0b11110000;
-    col[i] |= floor_color << 2 | floor_color;
   }
 }
 
