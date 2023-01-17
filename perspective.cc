@@ -392,7 +392,9 @@ static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
 static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
                       uint16_t cur_sy_bot, int16_t m_bot, uint8_t px) {
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
-  for (; cur_px < px; ++cur_px, cur_sy_top += m_top, cur_sy_bot += m_bot) {
+  bool top_off_screen = false;
+  bool bot_off_screen = false;
+  for (; cur_px < px; ++cur_px) {
     uint8_t cur_py_top = cur_sy_top / 256;
     if (cur_sy_top % 256 > 128)
       ++cur_py_top;
@@ -404,6 +406,30 @@ static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
       fb_col += 30;
     } else {
       draw_column_even(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
+    }
+    if (!top_off_screen) {
+      if (m_top < 0 && cur_sy_top < -m_top) {
+        top_off_screen = true;
+        cur_sy_top = 0;
+      } else if (m_top > 0 &&
+                 cur_sy_top > (int16_t)(screen_height * 256) - m_top) {
+        top_off_screen = true;
+        cur_sy_top = screen_height * 256;
+      } else {
+        cur_sy_top += m_top;
+      }
+    }
+    if (!bot_off_screen) {
+      if (m_bot < 0 && cur_sy_bot < -m_bot) {
+        bot_off_screen = true;
+        cur_sy_bot = 0;
+      } else if (m_bot > 0 &&
+                 cur_sy_bot > (int16_t)(screen_height * 256) - m_bot) {
+        bot_off_screen = true;
+        cur_sy_bot = screen_height * 256;
+      } else {
+        cur_sy_bot += m_bot;
+      }
     }
   }
 }
