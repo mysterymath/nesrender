@@ -45,6 +45,13 @@ Log::operator int16_t() const {
   if (exp >= 15 * 2048)
     return sign ? -32768 : 32767;
 
+  // Special case powers of two; these can be easily made exact, while the table
+  // solution is approximate.
+  if (!(exp & 0x07ff)) {
+    int16_t uval = 1 << (exp >> 11);
+    return sign ? -uval : uval;
+  }
+
   // Shift the exponent so the whole/frac boundary is along the byte.
   uint16_t split = exp;
   split >>= 3;
