@@ -249,19 +249,19 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     }
 
     if (lcur_sy_top < -Log::one() && lsy_top < -Log::one()) {
-      uint16_t cur_sy_top = 0;
+      cur_cc_y_top = -cur_cc_w;
+      lcur_cc_y_top = -lcur_cc_w;
+      lcur_sy_top = -Log::one();
+      cur_sy_top = 0;
       DEBUG("Clipped top: both sides.\n");
-      clip_bot_and_draw_to(Log::zero(), 0, lcur_sy_bot, lsx, sx, lsy_bot);
+      clip_bot_and_draw_to(Log::zero(), 0, lsx, sx, lsy_bot);
     } else {
       Log iscale = Log::pow2(13);
       Log lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) /
                    Log(lsx * iscale - lcur_sx * iscale);
       int16_t m_top = lm_top * Log::pow2(8);
       if (lcur_sy_top.abs() <= Log::one()) {
-        uint16_t cur_sy_top =
-            lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
-        clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top,
-                          lcur_sy_bot, lsx, sx, lsy_bot);
+        clip_bot_and_draw_to(lm_top, m_top, lsx, sx, lsy_bot);
       } else {
         int16_t dx = cc_x - cur_cc_x;
         int16_t dy_top = cc_y_top - cur_cc_y_top;
@@ -290,9 +290,19 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           Log lisect_sy_bot = lisect_cc_y_bot / lisect_cc_w;
           uint16_t isect_sx =
               lisect_sx * Log::pow2(13) + screen_width / 2 * 256;
+          cur_cc_y_top = -cur_cc_w;
+          lcur_cc_y_top = -lcur_cc_w;
+          lcur_sy_top = -Log::one();
+          cur_sy_top = 0;
           DEBUG("Clipped top left to top\n");
-          clip_bot_and_draw(lcur_sx, cur_sx, 0, Log::zero(), 0, lcur_sy_bot,
-                            lisect_sx, isect_sx, lisect_sy_bot);
+          clip_bot_and_draw_to(Log::zero(), 0, lisect_sx, isect_sx, lisect_sy_bot);
+          cur_cc_x = isect_cc_x;
+          cur_cc_y_top = isect_cc_y_top;
+          cur_cc_y_bot = isect_cc_y_bot;
+          cur_cc_w = isect_cc_w;
+          lcur_cc_x = lisect_cc_x;
+          lcur_cc_y_top = -lisect_cc_w;
+          lcur_cc_y_bot = lisect_cc_y_bot;
           clip_bot_and_draw(lisect_sx, isect_sx, 0, lm_top, m_top,
                             lisect_sy_bot, lsx, sx, lsy_bot);
         } else {
