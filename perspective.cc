@@ -374,7 +374,7 @@ static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
         cur_sy_bot >> 8, cur_sy_bot & 0xff, sx >> 8, sx & 0xff);
 
   // Adjust to the next pixel center.
-  int16_t offset = 128 - sx % 256;
+  int16_t offset = 128 - cur_sx % 256;
   if (offset < 0)
     offset += 256;
   if (offset) {
