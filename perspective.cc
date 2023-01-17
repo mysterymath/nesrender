@@ -225,27 +225,23 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     if (cur_bot_above_top && bot_above_top ||
         cur_top_below_bot && top_below_bot) {
       DEBUG("TB Frustum Cull: %d %d\n", cur_bot_above_top && bot_above_top,
-            cur_top_below_bot && bot_below_top);
+            cur_top_below_bot && top_below_bot);
       goto done;
     }
 
-    Log lm_top;
-    int16_t m_top;
-    uint16_t cur_sy_top;
     Log iscale = Log::pow2(13);
     Log m_denom = lsx * iscale - lcur_sx * iscale;
     if (cur_top_above_top && top_above_top) {
-      lm_top = Log::zero();
-      m_top = 0;
-      cur_sy_top = 0;
-      cur_top_above_top = top_above_top = false;
+      Log lm_top = Log::zero();
+      int16_t m_top = 0;
+      uint16_t cur_sy_top = 0;
       DEBUG("Clipped top: both sides.\n");
       clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top, lcur_sy_bot,
                         lsx, sx, lsy_bot, cur_bot_below_bot, bot_below_bot,
                         cur_bot_above_top, bot_above_top);
     } else {
-      lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom;
-      m_top = lm_top * Log::pow2(8);
+      Log lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) / m_denom;
+      int16_t m_top = lm_top * Log::pow2(8);
 
       if (cur_top_above_top || top_above_top || cur_top_below_bot ||
           top_below_bot) {
@@ -279,6 +275,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
           uint16_t isect_sx =
               lisect_sx * Log::pow2(13) + screen_width / 2 * 256;
           if (cur_top_above_top) {
+            DEBUG("Clipped top left to top\n");
             clip_bot_and_draw(lcur_sx, cur_sx, 0, Log::zero(), 0, lcur_sy_bot,
                               lisect_sx, isect_sx, lisect_sy_bot,
                               cur_bot_below_bot, isect_bot_below_bot,
@@ -288,7 +285,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
                               isect_bot_below_bot, bot_below_bot,
                               isect_bot_above_top, bot_above_top);
           } else {
-            cur_sy_top =
+            DEBUG("Clipped top right to top\n");
+            uint16_t cur_sy_top =
                 lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
             clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top,
                               lcur_sy_bot, lisect_sx, isect_sx, lisect_sy_bot,
@@ -300,10 +298,43 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
                               isect_bot_above_top, bot_above_top);
           }
         } else {
-          // TODO
+          // r(t) = cur + vt
+          // r(t)_y = r(t)_w
+          // cur_y + dyt = cur_w + dw*t;
+          // t*(dy - dw) = cur_w - cur_y
+          // t = (cur_w - cur_y) / (dy - dw)
+          Log t = Log(cur_cc_w - cur_cc_y_top) / Log(dy_top - dw);
+          int16_t isect_cc_x = cur_cc_x + ldx * t;
+          int16_t isect_cc_y_top = cur_cc_y_top + ldy_top * t;
+          int16_t isect_cc_y_bot = cur_cc_y_bot + ldy_bot * t;
+          int16_t isect_cc_w = isect_cc_y_top;
+          bool isect_bot_below_bot = isect_cc_y_bot > isect_cc_w;
+          bool isect_bot_above_top = isect_cc_y_bot < -isect_cc_w;
+          Log lisect_cc_x = isect_cc_x;
+          Log lisect_cc_y_bot = isect_cc_y_bot;
+          Log lisect_cc_w = isect_cc_w;
+          Log lisect_sx = lisect_cc_x / lisect_cc_w;
+          Log lisect_sy_bot = lisect_cc_y_bot / lisect_cc_w;
+          uint16_t isect_sx =
+              lisect_sx * Log::pow2(13) + screen_width / 2 * 256;
+          if (cur_top_below_bot) {
+            DEBUG("Clipped top left to bot\n");
+            clip_bot_and_draw(lisect_sx, isect_sx, screen_height * 256, lm_top,
+                              m_top, lcur_sy_bot, lsx, sx, lsy_bot,
+                              isect_bot_below_bot, bot_below_bot,
+                              isect_bot_above_top, bot_above_top);
+          } else {
+            DEBUG("Clipped top right to bot\n");
+            uint16_t cur_sy_top =
+                lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
+            clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top,
+                              lcur_sy_bot, lisect_sx, isect_sx, lisect_sy_bot,
+                              cur_bot_below_bot, isect_bot_below_bot,
+                              cur_bot_above_top, isect_bot_above_top);
+          }
         }
       } else {
-        cur_sy_top =
+        uint16_t cur_sy_top =
             lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
         clip_bot_and_draw(lcur_sx, cur_sx, cur_sy_top, lm_top, m_top,
                           lcur_sy_bot, lsx, sx, lsy_bot, cur_bot_below_bot,
