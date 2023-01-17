@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "draw.h"
 #include "log.h"
@@ -84,6 +85,9 @@ void draw_column_odd(uint8_t ceil_color, uint8_t wall_color,
                      uint8_t floor_color, uint8_t *col, uint8_t y_top,
                      uint8_t y_bot);
 }
+
+static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
+                      uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
 
 static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
                               Log lm_top, int16_t m_top, Log lcur_sy_bot,
@@ -222,10 +226,19 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     Log lsy_top = lcc_y_top / lcc_w;
     Log lsy_bot = lcc_y_bot / lcc_w;
 
-    if (cur_bot_above_top && bot_above_top ||
-        cur_top_below_bot && top_below_bot) {
-      DEBUG("TB Frustum Cull: %d %d\n", cur_bot_above_top && bot_above_top,
-            cur_top_below_bot && top_below_bot);
+    if (cur_top_below_bot && top_below_bot) {
+      DEBUG("Top frustum cull.\n");
+      uint8_t cur_px = cur_sx / 256;
+      uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
+      draw_wall(cur_px, screen_height * 256, 0, screen_height * 256, 0, px);
+      goto done;
+    }
+
+    if (cur_bot_above_top && bot_above_top) {
+      DEBUG("Bot frustum cull.\n");
+      uint8_t cur_px = cur_sx / 256;
+      uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
+      draw_wall(cur_px, 0, 0, 0, 0, px);
       goto done;
     }
 
@@ -390,9 +403,6 @@ static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
                              lm_bot, m_bot, sx);
   }
 }
-
-static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
-                      uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
 
 static void draw_after_fully_clipped(uint16_t cur_sx, uint16_t cur_sy_top,
                                      Log lm_top, int16_t m_top,

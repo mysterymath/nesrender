@@ -8,7 +8,6 @@ set(CMAKE_EXECUTABLE_SUFFIX .nes)
 add_executable(render
 	chr.s
 	draw.cc
-	draw_column.s
 	line.cc
 	main.cc
 	map.cc
