@@ -13,7 +13,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -159,6 +159,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         DEBUG_CC("Clipped Next", cc);
       }
     }
+
+    // TODO: Pass the top slope through to avoid mismatching rounding errors.
 
     bool cur_top_above_top = cur_cc_y_top < -cur_cc_w;
     bool cur_top_below_bot = cur_cc_y_top > cur_cc_w;
@@ -317,13 +319,29 @@ static void clipped_draw_to(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
   Log lsy_top = Log(cc_y_top) / lcc_w;
   Log lsy_bot = Log(cc_y_bot) / lcc_w;
 
-  uint16_t cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
-  uint16_t cur_sy_top =
-      lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
-  uint16_t cur_sy_bot =
-      lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
+  uint16_t cur_sx;
+  if (lcur_sx.abs() == Log::one())
+    cur_sx = lcur_sx.sign ? 0 : screen_width * 256;
+  else
+    cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
 
-  uint16_t sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
+  uint16_t cur_sy_top;
+  if (lcur_sy_top.abs() == Log::one())
+    cur_sy_top = lcur_sy_top.sign ? 0 : screen_height * 256;
+  else
+    cur_sy_top = lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
+
+  uint16_t cur_sy_bot;
+  if (lcur_sy_bot.abs() == Log::one())
+    cur_sy_bot = lcur_sy_bot.sign ? 0 : screen_height * 256;
+  else
+    cur_sy_bot = lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
+
+  uint16_t sx;
+  if (lsx.abs() == Log::one())
+    sx = lsx.sign ? 0 : screen_width * 256;
+  else
+    sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
 
   DEBUG("From screen: %u,[%u,%u)\n", cur_sx, cur_sy_top, cur_sy_bot);
   DEBUG("To sx: %u\n", sx);
@@ -347,8 +365,12 @@ static void clipped_draw_to(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
   if (offset) {
     cur_sx += offset;
     Log loffset = Log(offset);
-    cur_sy_top += lm_top * loffset;
-    cur_sy_bot += lm_bot * loffset;
+    if ((m_top >= 0 || cur_sy_top >= -m_top) &&
+        (m_top <= 0 || cur_sy_top <= screen_height * 256 - m_top))
+      cur_sy_top += lm_top * loffset;
+    if ((m_bot >= 0 || cur_sy_bot >= -m_top) &&
+        (m_bot <= 0 || cur_sy_bot <= screen_height * 256 - m_top))
+      cur_sy_bot += lm_bot * loffset;
     DEBUG("New cur: %u,[%u,%u)\n", cur_sx, cur_sy_top, cur_sy_bot);
   }
 
