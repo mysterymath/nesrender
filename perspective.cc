@@ -15,7 +15,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -114,12 +114,10 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     goto done;
 
   {
-    DEBUG("%d %d %d %d\n", cur_left_of_left, cur_right_of_right, left_of_left,
-          right_of_right);
-
     if (cur_left_of_left && left_of_left ||
         cur_right_of_right && right_of_right) {
-      DEBUG("LR frustum cull: %d %d\n", cur_left_of_left && left_of_left,
+      DEBUG("LR frustum cull round 1: %d %d\n",
+            cur_left_of_left && left_of_left,
             cur_right_of_right && right_of_right);
       goto done;
     }
@@ -130,6 +128,50 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     if (Log(cur_cc_x) * Log(cc_w) >= Log(cur_cc_w) * Log(cc_x)) {
       DEBUG("Backface cull.\n");
       goto done;
+    }
+
+    // Negative w can cause naive frustum culling not to work due to a litany of
+    // corner cases, so clip to w=1 (no division by zero please) and cull again.
+    if (cur_cc_w < 1 || cc_w < 1) {
+      int16_t dx = cc_x - cur_cc_x;
+      int16_t dy_top = cc_y_top - cur_cc_y_top;
+      int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
+      int16_t dw = cc_w - cur_cc_w;
+      Log ldx = dx;
+      Log ldy_top = dy_top;
+      Log ldy_bot = dy_bot;
+      Log ldw = dw;
+
+      if (cur_cc_w < 1) {
+        // w = 1 = cur_w + dw*t
+        Log t = Log(1 - cur_cc_w) / ldw;
+        cur_cc_x += ldx * t;
+        cur_cc_y_top += ldy_top * t;
+        cur_cc_y_bot += ldy_bot * t;
+        cur_cc_w = 1;
+        cur_left_of_left = cur_cc_x < -cur_cc_w;
+        cur_right_of_right = cur_cc_x > cur_cc_w;
+        DEBUG("Clipped cur to w=1.\n");
+        DEBUG_CC("Cur", cur_cc);
+      } else {
+        Log t = Log(1 - cc_w) / ldw;
+        cc_x += ldx * t;
+        cc_y_top += ldy_top * t;
+        cc_y_bot += ldy_bot * t;
+        cc_w = 1;
+        left_of_left = cc_x < -cc_w;
+        right_of_right = cc_x > cc_w;
+        DEBUG("Clipped next to w=1.\n");
+        DEBUG_CC("Next", cc);
+      }
+
+      if (cur_left_of_left && left_of_left ||
+          cur_right_of_right && right_of_right) {
+        DEBUG("LR frustum cull round 2: %d %d\n",
+              cur_left_of_left && left_of_left,
+              cur_right_of_right && right_of_right);
+        goto done;
+      }
     }
 
     // Note that the logarithmic sx values range from [-1, 1], while the
@@ -150,7 +192,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
         DEBUG_CC("Cur", cur_cc);
         DEBUG_CC("Next", cc);
         // r(t) = cur + vt
-        // w(t)_x = -w(t)_w
+        // r(t)_x = -r(t)_w
         // cur_x + dxt = -cur_w - dw*t;
         // t*(dx + dw) = -cur_w - cur_x
         // t = (-cur_w - cur_x) / (dx + dw)
