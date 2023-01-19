@@ -23,7 +23,7 @@ asm(".globl __chr_rom_size\n"
 bool overhead_view = true;
 
 int main() {
-  static const uint8_t bg_pal[16] = {0x00, 0x10, 0x01, 0x11};
+  static const uint8_t bg_pal[16] = {0x16, 0x06, 0x07, 0x0f};
   static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
