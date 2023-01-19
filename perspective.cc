@@ -11,9 +11,11 @@
 #include "trig.h"
 #include "util.h"
 
+#include <6502.h>
+
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-// #define DEBUG_FILE
+#define DEBUG_FILE
 #include "debug.h"
 
 static void move_to(uint16_t x, uint16_t y);
@@ -66,16 +68,25 @@ template <bool is_odd>
 void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
                  uint8_t *col, uint8_t y_top, uint8_t y_bot);
 
-static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
-                      uint16_t cur_sy_bot, int16_t m_bot, uint8_t px);
+static void draw_wall(uint8_t cur_px, uint8_t px);
 
-#if 0
-static void clip_bot_and_draw(Log lcur_sx, uint16_t cur_sx, uint16_t cur_sy_top,
-                              Log lm_top, int16_t m_top, Log lcur_sy_bot,
-                              Log lsx, uint16_t sx, Log lsy_bot);
-#endif
-static void clip_bot_and_draw_to(int16_t cc_x, int16_t cc_y_top,
-                                 int16_t cc_y_bot, int16_t cc_w);
+static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
+                                 int16_t cc_y_top, int16_t cc_y_bot,
+                                 int16_t cc_w);
+
+static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
+                                    int16_t cur_cc_y, int16_t cur_cc_w,
+                                    int16_t cc_x, int16_t cc_y, int16_t cc_w);
+static void rasterize_edge(uint8_t *edge, uint8_t cur_px, uint16_t cur_sy,
+                           int16_t m, uint8_t px);
+
+static uint16_t lsx_to_sx(Log lsx);
+static uint16_t lsy_to_sy(Log lsy);
+
+static uint8_t s_to_p(uint16_t s);
+
+static uint8_t py_tops[64];
+static uint8_t py_bots[64];
 
 __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
@@ -103,12 +114,17 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     goto done;
 
   {
+    DEBUG("%d %d %d %d\n", cur_left_of_left, cur_right_of_right, left_of_left,
+          right_of_right);
+
     if (cur_left_of_left && left_of_left ||
         cur_right_of_right && right_of_right) {
       DEBUG("LR frustum cull: %d %d\n", cur_left_of_left && left_of_left,
             cur_right_of_right && right_of_right);
       goto done;
     }
+
+    // TODO: This won't work; it could go out of range.
 
     // Use cross product to backface cull.
     if (Log(cur_cc_x) * Log(cc_w) >= Log(cur_cc_w) * Log(cc_x)) {
@@ -160,72 +176,13 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       }
     }
 
-    // TODO: Pass the top slope through to avoid mismatching rounding errors.
+    clip_and_rasterize_edge(py_tops, cur_cc_x, cur_cc_y_top, cur_cc_w, cc_x,
+                            cc_y_top, cc_w);
+    clip_and_rasterize_edge(py_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cc_x,
+                            cc_y_bot, cc_w);
 
-    bool cur_top_above_top = cur_cc_y_top < -cur_cc_w;
-    bool cur_top_below_bot = cur_cc_y_top > cur_cc_w;
-    bool top_above_top = cc_y_top < -cc_w;
-    bool top_below_bot = cc_y_top > cc_w;
-
-    if (cur_top_above_top && top_above_top) {
-      cur_cc_y_top = -cur_cc_w;
-      DEBUG("Clipped both sides of top to top.\n");
-      clip_bot_and_draw_to(cc_x, -cc_w, cc_y_bot, cc_w);
-    } else if (cur_top_below_bot && top_below_bot) {
-      DEBUG("Clipped both sides of top to bot.\n");
-      cur_cc_y_top = cur_cc_w;
-      clip_bot_and_draw_to(cc_x, cc_w, cc_y_bot, cc_w);
-      goto done;
-    } else if (cur_top_above_top || cur_top_below_bot) {
-      int16_t dx = cc_x - cur_cc_x;
-      int16_t dy_top = cc_y_top - cur_cc_y_top;
-      int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
-      int16_t dw = cc_w - cur_cc_w;
-
-      if (cur_top_above_top) {
-        // r(t) = cur + vt
-        // r(t)_y = -r(t)_w
-        // cur_y + dyt = -cur_w - dw*t;
-        // t*(dy + dw) = -cur_w - cur_y
-        // t = (-cur_w - cur_y) / (dy + dw)
-        Log t = Log(-cur_cc_w - cur_cc_y_top) / Log(dy_top + dw);
-        int16_t isect_cc_x = cur_cc_x + Log(dx) * t;
-        int16_t isect_cc_y_top = cur_cc_y_top + Log(dy_top) * t;
-        int16_t isect_cc_y_bot = cur_cc_y_bot + Log(dy_bot) * t;
-        int16_t isect_cc_w = -isect_cc_y_top;
-        cur_cc_y_top = -cur_cc_w;
-        DEBUG("Clipped top left to top\n");
-        clip_bot_and_draw_to(isect_cc_x, isect_cc_y_top, isect_cc_y_bot,
-                             isect_cc_w);
-        cur_cc_x = isect_cc_x;
-        cur_cc_y_top = isect_cc_y_top;
-        cur_cc_y_bot = isect_cc_y_bot;
-        cur_cc_w = isect_cc_w;
-        clip_bot_and_draw_to(cc_x, cc_y_top, cc_y_bot, cc_w);
-      } else {
-        // r(t) = cur + vt
-        // r(t)_y = r(t)_w
-        // cur_y + dyt = cur_w + dw*t;
-        // t*(dy - dw) = cur_w - cur_y
-        // t = (cur_w - cur_y) / (dy - dw)
-        Log t = Log(cur_cc_w - cur_cc_y_top) / Log(dy_top - dw);
-        int16_t isect_cc_x = cur_cc_x + Log(dx) * t;
-        int16_t isect_cc_y_top = cur_cc_y_top + Log(dy_top) * t;
-        int16_t isect_cc_y_bot = cur_cc_y_bot + Log(dy_bot) * t;
-        int16_t isect_cc_w = isect_cc_y_top;
-        DEBUG("Clipped top left to bot\n");
-        cur_cc_y_top = cur_cc_w;
-        clip_bot_and_draw_to(isect_cc_x, isect_cc_y_top, isect_cc_y_bot,
-                             isect_cc_w);
-        cur_cc_x = isect_cc_x;
-        cur_cc_y_top = isect_cc_y_top;
-        cur_cc_y_bot = isect_cc_y_bot;
-        cur_cc_w = isect_cc_w;
-        clip_bot_and_draw_to(cc_x, cc_y_top, cc_y_bot, cc_w);
-      }
-    } else {
-      clip_bot_and_draw_to(cc_x, cc_y_top, cc_y_bot, cc_w);
-    }
+    draw_wall(s_to_p(lsx_to_sx(Log(cur_cc_x) / Log(cur_cc_w))),
+              s_to_p(lsx_to_sx(Log(cc_x) / Log(cc_w))));
   }
 
 done:
@@ -235,191 +192,161 @@ done:
   cur_cc_w = orig_cc_w;
 }
 
-static void clipped_draw_to(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                            int16_t cc_w);
+static uint16_t lsx_to_sx(Log lsx) {
+  if (lsx.abs() == Log::one())
+    return lsx.sign ? 0 : screen_width * 256;
+  else
+    return lsx * Log::pow2(13) + screen_width / 2 * 256;
+}
 
-static void clip_bot_and_draw_to(int16_t cc_x, int16_t cc_y_top,
-                                 int16_t cc_y_bot, int16_t cc_w) {
-  bool cur_bot_above_top = cur_cc_y_bot < -cur_cc_w;
-  bool cur_bot_below_bot = cur_cc_y_bot > cur_cc_w;
-  bool bot_above_top = cc_y_bot < -cc_w;
-  bool bot_below_bot = cc_y_bot > cc_w;
-  if (cur_bot_above_top && bot_above_top) {
-    cur_cc_y_bot = -cur_cc_w;
-    DEBUG("Clipped both sides of bot to top.\n");
-    clipped_draw_to(cc_x, cc_y_top, -cc_w, cc_w);
-  } else if (cur_bot_below_bot && bot_below_bot) {
-    DEBUG("Clipped both sides of bot to bot.\n");
-    cur_cc_y_bot = cur_cc_w;
-    clipped_draw_to(cc_x, cc_y_top, cc_w, cc_w);
-  } else if (cur_bot_above_top || cur_bot_below_bot) {
+static uint16_t lsy_to_sy(Log lsy) {
+  if (lsy.abs() == Log::one())
+    return lsy.sign ? 0 : screen_height * 256;
+  else
+    return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
+}
+
+static uint8_t s_to_p(uint16_t s) {
+  return s % 256 <= 128 ? s / 256 : s / 256 + 1;
+}
+
+static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
+                                    int16_t cur_cc_y, int16_t cur_cc_w,
+                                    int16_t cc_x, int16_t cc_y, int16_t cc_w) {
+  if (cur_cc_w == 0 || cc_w == 0) {
+    BRK();
+  }
+  bool cur_above_top = cur_cc_y < -cur_cc_w;
+  bool cur_below_bot = cur_cc_y > cur_cc_w;
+  bool above_top = cc_y < -cc_w;
+  bool below_bot = cc_y > cc_w;
+
+  if (!cur_above_top && !cur_below_bot && !above_top && !below_bot) {
+    Log lcur_cc_w = cur_cc_w;
+    Log lcc_w = cc_w;
+
+    Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
+    Log lcur_sy = Log(cur_cc_y) / lcur_cc_w;
+
+    Log lsx = Log(cc_x) / lcc_w;
+    Log lsy = Log(cc_y) / lcc_w;
+
+    uint16_t cur_sx = lsx_to_sx(lcur_sx);
+    uint16_t cur_sy = lsy_to_sy(lcur_sy);
+    uint16_t sx = lsx_to_sx(lsx);
+    DEBUG("From screen: %u,%u)\n", cur_sx, cur_sy);
+    DEBUG("To sx: %u\n", sx);
+
+    Log iscale = Log::pow2(13);
+    Log lm = Log(lsy * iscale - lcur_sy * iscale) /
+             Log(lsx * iscale - lcur_sx * iscale);
+    int16_t m = lm * Log::pow2(8);
+    DEBUG("m: %d\n", m);
+
+    // Adjust to the next pixel center.
+    int16_t offset = 128 - cur_sx % 256;
+    if (offset < 0)
+      offset += 256;
+    DEBUG("Offset: %d\n", offset);
+    if (offset) {
+      cur_sx += offset;
+      Log loffset = Log(offset);
+      if ((m >= 0 || cur_sy >= -m) &&
+          (m <= 0 || cur_sy <= screen_height * 256 - m))
+        cur_sy += lm * loffset;
+      DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
+    }
+
+    rasterize_edge(edge, s_to_p(cur_sx), cur_sy, m, s_to_p(sx));
+  } else if (cur_above_top && above_top) {
+    DEBUG("Clipped both sides to top.\n");
+    clip_and_rasterize_edge(edge, cur_cc_x, -cur_cc_w, cur_cc_w, cc_x, -cc_w,
+                            cc_w);
+  } else if (cur_below_bot && below_bot) {
+    DEBUG("Clipped both sides to bot.\n");
+    clip_and_rasterize_edge(edge, cur_cc_x, cur_cc_w, cur_cc_w, cc_x, cc_w,
+                            cc_w);
+  } else {
     int16_t dx = cc_x - cur_cc_x;
-    int16_t dy_top = cc_y_top - cur_cc_y_top;
-    int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
+    int16_t dy = cc_y - cur_cc_y;
     int16_t dw = cc_w - cur_cc_w;
 
-    if (cur_bot_above_top) {
+    int16_t isect_cc_x;
+    int16_t isect_cc_y;
+    int16_t isect_cc_w;
+    if (cur_above_top || above_top) {
+      DEBUG("Clipped to top.\n");
       // r(t) = cur + vt
       // r(t)_y = -r(t)_w
       // cur_y + dyt = -cur_w - dw*t;
       // t*(dy + dw) = -cur_w - cur_y
       // t = (-cur_w - cur_y) / (dy + dw)
-      Log t = Log(-cur_cc_w - cur_cc_y_bot) / Log(dy_bot + dw);
-      int16_t isect_cc_x = cur_cc_x + Log(dx) * t;
-      int16_t isect_cc_y_top = cur_cc_y_top + Log(dy_top) * t;
-      int16_t isect_cc_y_bot = cur_cc_y_bot + Log(dy_bot) * t;
-      int16_t isect_cc_w = -isect_cc_y_bot;
-      cur_cc_y_bot = -cur_cc_w;
-      DEBUG("Clipped bot left to top\n");
-      clipped_draw_to(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
-      cur_cc_x = isect_cc_x;
-      cur_cc_y_top = isect_cc_y_top;
-      cur_cc_y_bot = isect_cc_y_bot;
-      cur_cc_w = isect_cc_w;
-      clipped_draw_to(cc_x, cc_y_top, cc_y_bot, cc_w);
+      Log t = Log(-cur_cc_w - cur_cc_y) / Log(dy + dw);
+      isect_cc_x = cur_cc_x + Log(dx) * t;
+      isect_cc_y = cur_cc_y + Log(dy) * t;
+      isect_cc_w = -isect_cc_y;
     } else {
+      DEBUG("Clipped to bot.\n");
       // r(t) = cur + vt
       // r(t)_y = r(t)_w
       // cur_y + dyt = cur_w + dw*t;
       // t*(dy - dw) = cur_w - cur_y
       // t = (cur_w - cur_y) / (dy - dw)
-      Log t = Log(cur_cc_w - cur_cc_y_bot) / Log(dy_bot - dw);
-      int16_t isect_cc_x = cur_cc_x + Log(dx) * t;
-      int16_t isect_cc_y_top = cur_cc_y_top + Log(dy_top) * t;
-      int16_t isect_cc_y_bot = cur_cc_y_bot + Log(dy_bot) * t;
-      int16_t isect_cc_w = isect_cc_y_bot;
-      DEBUG("Clipped bot left to bot\n");
-      cur_cc_y_bot = cur_cc_w;
-      clipped_draw_to(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
-      cur_cc_x = isect_cc_x;
-      cur_cc_y_top = isect_cc_y_top;
-      cur_cc_y_bot = isect_cc_y_bot;
-      cur_cc_w = isect_cc_w;
-      clipped_draw_to(cc_x, cc_y_top, cc_y_bot, cc_w);
+      Log t = Log(cur_cc_w - cur_cc_y) / Log(dy - dw);
+      isect_cc_x = cur_cc_x + Log(dx) * t;
+      isect_cc_y = cur_cc_y + Log(dy) * t;
+      isect_cc_w = isect_cc_y;
     }
-  } else {
-    clipped_draw_to(cc_x, cc_y_top, cc_y_bot, cc_w);
+    DEBUG("isect: (%d,%d,%d)\n", isect_cc_x, isect_cc_y, isect_cc_w);
+    if (cur_above_top || cur_below_bot) {
+      DEBUG("Clipped left side of edge.\n");
+      clip_and_rasterize_edge(edge, cur_cc_x,
+                              cur_above_top ? -cur_cc_w : cur_cc_w, cur_cc_w,
+                              isect_cc_x, isect_cc_y, isect_cc_w);
+      clip_and_rasterize_edge(edge, isect_cc_x, isect_cc_y, isect_cc_w, cc_x,
+                              cc_y, cc_w);
+    } else {
+      DEBUG("Clipped right side of edge.\n");
+      clip_and_rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, isect_cc_x,
+                              isect_cc_y, isect_cc_w);
+      clip_and_rasterize_edge(edge, isect_cc_x, isect_cc_y, isect_cc_w, cc_x,
+                              above_top ? -cc_w : cc_w, cc_w);
+    }
   }
 }
 
-static void clipped_draw_to(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                            int16_t cc_w) {
-  DEBUG("Clipped segment:\n");
-  DEBUG_CC("From", cur_cc);
-  DEBUG_CC("To", cc);
-
-  Log lcur_cc_w = cur_cc_w;
-  Log lcc_w = cc_w;
-
-  Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
-  Log lcur_sy_top = Log(cur_cc_y_top) / lcur_cc_w;
-  Log lcur_sy_bot = Log(cur_cc_y_bot) / lcur_cc_w;
-
-  Log lsx = Log(cc_x) / lcc_w;
-  Log lsy_top = Log(cc_y_top) / lcc_w;
-  Log lsy_bot = Log(cc_y_bot) / lcc_w;
-
-  uint16_t cur_sx;
-  if (lcur_sx.abs() == Log::one())
-    cur_sx = lcur_sx.sign ? 0 : screen_width * 256;
-  else
-    cur_sx = lcur_sx * Log::pow2(13) + screen_width / 2 * 256;
-
-  uint16_t cur_sy_top;
-  if (lcur_sy_top.abs() == Log::one())
-    cur_sy_top = lcur_sy_top.sign ? 0 : screen_height * 256;
-  else
-    cur_sy_top = lcur_sy_top * lh_over_2_times_256 + screen_height / 2 * 256;
-
-  uint16_t cur_sy_bot;
-  if (lcur_sy_bot.abs() == Log::one())
-    cur_sy_bot = lcur_sy_bot.sign ? 0 : screen_height * 256;
-  else
-    cur_sy_bot = lcur_sy_bot * lh_over_2_times_256 + screen_height / 2 * 256;
-
-  uint16_t sx;
-  if (lsx.abs() == Log::one())
-    sx = lsx.sign ? 0 : screen_width * 256;
-  else
-    sx = lsx * Log::pow2(13) + screen_width / 2 * 256;
-
-  DEBUG("From screen: %u,[%u,%u)\n", cur_sx, cur_sy_top, cur_sy_bot);
-  DEBUG("To sx: %u\n", sx);
-
-  Log iscale = Log::pow2(13);
-  Log lm_denom = Log(lsx * iscale - lcur_sx * iscale);
-
-  Log lm_top = Log(lsy_top * iscale - lcur_sy_top * iscale) / lm_denom;
-  int16_t m_top = lm_top * Log::pow2(8);
-  DEBUG("m_top: %d\n", m_top);
-
-  Log lm_bot = Log(lsy_bot * iscale - lcur_sy_bot * iscale) / lm_denom;
-  int16_t m_bot = lm_bot * Log::pow2(8);
-  DEBUG("m_bot: %d\n", m_bot);
-
-  // Adjust to the next pixel center.
-  int16_t offset = 128 - cur_sx % 256;
-  if (offset < 0)
-    offset += 256;
-  DEBUG("Offset: %d\n", offset);
-  if (offset) {
-    cur_sx += offset;
-    Log loffset = Log(offset);
-    if ((m_top >= 0 || cur_sy_top >= -m_top) &&
-        (m_top <= 0 || cur_sy_top <= screen_height * 256 - m_top))
-      cur_sy_top += lm_top * loffset;
-    if ((m_bot >= 0 || cur_sy_bot >= -m_top) &&
-        (m_bot <= 0 || cur_sy_bot <= screen_height * 256 - m_top))
-      cur_sy_bot += lm_bot * loffset;
-    DEBUG("New cur: %u,[%u,%u)\n", cur_sx, cur_sy_top, cur_sy_bot);
-  }
-
-  uint8_t cur_px = cur_sx / 256;
-  uint8_t px = sx % 256 <= 128 ? sx / 256 : sx / 256 + 1;
-  draw_wall(cur_px, cur_sy_top, m_top, cur_sy_bot, m_bot, px);
-}
-
-static void draw_wall(uint8_t cur_px, uint16_t cur_sy_top, int16_t m_top,
-                      uint16_t cur_sy_bot, int16_t m_bot, uint8_t px) {
-  uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
-  bool top_off_screen = false;
-  bool bot_off_screen = false;
+static void rasterize_edge(uint8_t *edge, uint8_t cur_px, uint16_t cur_sy,
+                           int16_t m, uint8_t px) {
+  DEBUG("Rasterized edge.\nFrom: %d,%d. To x: %d. Slope: %d\n", cur_px, cur_sy,
+        px, m);
+  bool off_screen = false;
   for (; cur_px < px; ++cur_px) {
-    uint8_t cur_py_top = cur_sy_top / 256;
-    if (cur_sy_top % 256 > 128)
-      ++cur_py_top;
-    uint8_t cur_py_bot = cur_sy_bot / 256 + 1;
-    if (cur_sy_bot % 256 <= 128)
-      --cur_py_bot;
+    uint8_t cur_py = cur_sy / 256;
+    if (cur_sy % 256 > 128)
+      ++cur_py;
+    edge[cur_px] = cur_py;
+    if (!off_screen) {
+      if (m < 0 && cur_sy < -m) {
+        off_screen = true;
+        cur_sy = 0;
+      } else if (m > 0 && cur_sy > (int16_t)(screen_height * 256) - m) {
+        off_screen = true;
+        cur_sy = screen_height * 256;
+      } else {
+        cur_sy += m;
+      }
+    }
+  }
+}
+
+static void draw_wall(uint8_t cur_px, uint8_t px) {
+  uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
+  for (; cur_px < px; ++cur_px) {
     if (cur_px & 1) {
-      draw_column<true>(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
+      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px]);
       fb_col += 30;
     } else {
-      draw_column<false>(0, 3, 1, fb_col, cur_py_top, cur_py_bot);
-    }
-    if (!top_off_screen) {
-      if (m_top < 0 && cur_sy_top < -m_top) {
-        top_off_screen = true;
-        cur_sy_top = 0;
-      } else if (m_top > 0 &&
-                 cur_sy_top > (int16_t)(screen_height * 256) - m_top) {
-        top_off_screen = true;
-        cur_sy_top = screen_height * 256;
-      } else {
-        cur_sy_top += m_top;
-      }
-    }
-    if (!bot_off_screen) {
-      if (m_bot < 0 && cur_sy_bot < -m_bot) {
-        bot_off_screen = true;
-        cur_sy_bot = 0;
-      } else if (m_bot > 0 &&
-                 cur_sy_bot > (int16_t)(screen_height * 256) - m_bot) {
-        bot_off_screen = true;
-        cur_sy_bot = screen_height * 256;
-      } else {
-        cur_sy_bot += m_bot;
-      }
+      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px]);
     }
   }
 }
