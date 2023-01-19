@@ -118,14 +118,6 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
       goto done;
     }
 
-    // TODO: This won't work; it could go out of range.
-
-    // Use cross product to backface cull.
-    if (Log(cur_cc_x) * Log(cc_w) >= Log(cur_cc_w) * Log(cc_x)) {
-      DEBUG("Backface cull.\n");
-      goto done;
-    }
-
     // Negative w can cause naive frustum culling not to work due to a litany of
     // corner cases, so clip to w=1 (no division by zero please) and cull again.
     if (cur_cc_w < 1 || cc_w < 1) {
@@ -168,6 +160,11 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
               cur_right_of_right && right_of_right);
         goto done;
       }
+    }
+
+    if (Log(cur_cc_x) / Log(cur_cc_w) >= Log(cc_x) / Log(cc_w)) {
+      DEBUG("Backface cull.\n");
+      goto done;
     }
 
     // Note that the logarithmic sx values range from [-1, 1], while the
