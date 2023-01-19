@@ -18,10 +18,12 @@
 
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
+static void clear_col_z();
 
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
+  clear_col_z();
   move_to(400, 400);
   draw_to(400, 600);
   draw_to(600, 600);
@@ -40,6 +42,14 @@ static int16_t cur_cc_w;
 
 constexpr int16_t wall_top_z = 80;
 constexpr int16_t wall_bot_z = 20;
+
+static uint8_t col_z_lo[screen_width];
+static uint8_t col_z_hi[screen_width];
+
+static void clear_col_z() {
+  memset(col_z_lo, 0xff, sizeof col_z_lo);
+  memset(col_z_hi, 0xff, sizeof col_z_hi);
+}
 
 #define DEBUG_CC(PREFIX, NAME)                                                 \
   DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
@@ -63,7 +73,7 @@ template <bool is_odd>
 void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
                  uint8_t *col, uint8_t y_top, uint8_t y_bot);
 
-static void draw_wall(uint8_t cur_px, uint8_t px);
+static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px);
 
 static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
                                  int16_t cc_y_top, int16_t cc_y_bot,
@@ -78,6 +88,7 @@ static void rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
 
 static uint16_t lsx_to_sx(Log lsx);
 static uint16_t lsy_to_sy(Log lsy);
+static uint16_t lsz_to_sz(Log lsy);
 
 static uint8_t s_to_p(uint16_t s);
 
@@ -216,8 +227,24 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     clip_and_rasterize_edge(py_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cc_x,
                             cc_y_bot, cc_w);
 
-    draw_wall(s_to_p(lsx_to_sx(Log(cur_cc_x) / Log(cur_cc_w))),
-              s_to_p(lsx_to_sx(Log(cc_x) / Log(cc_w))));
+    Log lcur_sx = Log(cur_cc_x) / Log(cur_cc_w);
+    Log lsx = Log(cc_x) / Log(cc_w);
+
+    uint16_t w_near = 1;
+    uint16_t w_far = 65535;
+
+    Log lcur_sz = -Log::one() / Log(cur_cc_w);
+    uint16_t cur_sz = lsz_to_sz(lcur_sz);
+    Log lsz = -Log::one() / Log(cc_w);
+    Log iscale = Log::pow2(13);
+    DEBUG("cur_sz: %u, sz: %u\n", lsz_to_sz(lcur_sz), lsz_to_sz(lsz));
+    Log lzm = Log(lsz * iscale - lcur_sz * iscale) /
+              Log(lsx * iscale - lcur_sx * iscale);
+    // Increasing sx by one increases lsx by 1/2^5. This in turn increases lsz by m / 2^5
+    // This then increases sz by m / 2^5 * 2^16 = m * 2^11.
+    int16_t zm = lzm * Log::pow2(11);
+
+    draw_wall(s_to_p(lsx_to_sx(lcur_sx)), cur_sz, zm, s_to_p(lsx_to_sx(lsx)));
   }
 
 done:
@@ -239,6 +266,10 @@ static uint16_t lsy_to_sy(Log lsy) {
     return lsy.sign ? 0 : screen_height * 256;
   else
     return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
+}
+
+static uint16_t lsz_to_sz(Log lsz) {
+  return (32768 + lsz * Log::pow2(15)) * 2;
 }
 
 static uint8_t s_to_p(uint16_t s) {
@@ -327,12 +358,12 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
   uint16_t cur_sx = lsx_to_sx(lcur_sx);
   uint16_t cur_sy = lsy_to_sy(lcur_sy);
   uint16_t sx = lsx_to_sx(lsx);
-  DEBUG("From screen: %u,%u)\n", cur_sx, cur_sy);
+  DEBUG("From screen: %u,%u\n", cur_sx, cur_sy);
   DEBUG("To sx: %u\n", sx);
 
   Log iscale = Log::pow2(13);
-  Log lm = Log(lsy * iscale - lcur_sy * iscale) /
-           Log(lsx * iscale - lcur_sx * iscale);
+  Log lm_denom = Log(lsx * iscale - lcur_sx * iscale);
+  Log lm = Log(lsy * iscale - lcur_sy * iscale) / lm_denom;
   int16_t m = lm * Log::pow2(8);
   DEBUG("m: %d\n", m);
 
@@ -371,9 +402,18 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
   }
 }
 
-static void draw_wall(uint8_t cur_px, uint8_t px) {
+static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
+  DEBUG("x: [%d,%d), sz: %u, zm: %d\n", cur_px, px, sz, zm);
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
-  for (; cur_px < px; ++cur_px) {
+  for (; cur_px < px; ++cur_px, sz += zm) {
+    uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
+    if (sz >= col_z) {
+      if (cur_px & 1)
+        fb_col += 30;
+      continue;
+    }
+    col_z_lo[cur_px] = sz & 0xff;
+    col_z_hi[cur_px] = sz >> 8;
     if (cur_px & 1) {
       draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px]);
       fb_col += 30;
