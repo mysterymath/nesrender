@@ -20,7 +20,6 @@ add_executable(render
 	screen.cc
 	sin.c
 	trig.c
-	wall.cc
 )
 
 target_link_libraries(render neslib nesdoug)
