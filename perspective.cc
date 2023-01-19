@@ -11,8 +11,6 @@
 #include "trig.h"
 #include "util.h"
 
-#include <6502.h>
-
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
 // #define DEBUG_FILE
@@ -24,15 +22,12 @@ static void draw_to(uint16_t x, uint16_t y);
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
-  // move_to(400, 400);
-  // draw_to(400, 600);
-  // draw_to(600, 600);
-  // draw_to(500, 500);
-  // draw_to(600, 400);
-  // draw_to(400, 400);
-
-  move_to(600, 600);
+  move_to(400, 400);
+  draw_to(400, 600);
+  draw_to(600, 600);
+  draw_to(500, 500);
   draw_to(600, 400);
+  draw_to(400, 400);
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
@@ -77,8 +72,9 @@ static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
 static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w);
-static void rasterize_edge(uint8_t *edge, uint8_t cur_px, uint16_t cur_sy,
-                           int16_t m, uint8_t px);
+static void rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
+                           int16_t cur_cc_w, int16_t cc_x, int16_t cc_y,
+                           int16_t cc_w);
 
 static uint16_t lsx_to_sx(Log lsx);
 static uint16_t lsy_to_sy(Log lsy);
@@ -255,51 +251,13 @@ static uint8_t s_to_p(uint16_t s) {
 static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w) {
-  if (cur_cc_w == 0 || cc_w == 0) {
-    BRK();
-  }
   bool cur_above_top = cur_cc_y < -cur_cc_w;
   bool cur_below_bot = cur_cc_y > cur_cc_w;
   bool above_top = cc_y < -cc_w;
   bool below_bot = cc_y > cc_w;
 
   if (!cur_above_top && !cur_below_bot && !above_top && !below_bot) {
-    Log lcur_cc_w = cur_cc_w;
-    Log lcc_w = cc_w;
-
-    Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
-    Log lcur_sy = Log(cur_cc_y) / lcur_cc_w;
-
-    Log lsx = Log(cc_x) / lcc_w;
-    Log lsy = Log(cc_y) / lcc_w;
-
-    uint16_t cur_sx = lsx_to_sx(lcur_sx);
-    uint16_t cur_sy = lsy_to_sy(lcur_sy);
-    uint16_t sx = lsx_to_sx(lsx);
-    DEBUG("From screen: %u,%u)\n", cur_sx, cur_sy);
-    DEBUG("To sx: %u\n", sx);
-
-    Log iscale = Log::pow2(13);
-    Log lm = Log(lsy * iscale - lcur_sy * iscale) /
-             Log(lsx * iscale - lcur_sx * iscale);
-    int16_t m = lm * Log::pow2(8);
-    DEBUG("m: %d\n", m);
-
-    // Adjust to the next pixel center.
-    int16_t offset = 128 - cur_sx % 256;
-    if (offset < 0)
-      offset += 256;
-    DEBUG("Offset: %d\n", offset);
-    if (offset) {
-      cur_sx += offset;
-      Log loffset = Log(offset);
-      if ((m >= 0 || cur_sy >= -m) &&
-          (m <= 0 || cur_sy <= screen_height * 256 - m))
-        cur_sy += lm * loffset;
-      DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
-    }
-
-    rasterize_edge(edge, s_to_p(cur_sx), cur_sy, m, s_to_p(sx));
+    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, cc_x, cc_y, cc_w);
   } else if (cur_above_top && above_top) {
     DEBUG("Clipped both sides to top.\n");
     clip_and_rasterize_edge(edge, cur_cc_x, -cur_cc_w, cur_cc_w, cc_x, -cc_w,
@@ -357,12 +315,47 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
   }
 }
 
-static void rasterize_edge(uint8_t *edge, uint8_t cur_px, uint16_t cur_sy,
-                           int16_t m, uint8_t px) {
-  DEBUG("Rasterized edge.\nFrom: %d,%d. To x: %d. Slope: %d\n", cur_px, cur_sy,
-        px, m);
+__attribute__((noinline)) static void
+rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
+               int16_t cur_cc_w, int16_t cc_x, int16_t cc_y, int16_t cc_w) {
+  Log lcur_cc_w = cur_cc_w;
+  Log lcc_w = cc_w;
+
+  Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
+  Log lcur_sy = Log(cur_cc_y) / lcur_cc_w;
+
+  Log lsx = Log(cc_x) / lcc_w;
+  Log lsy = Log(cc_y) / lcc_w;
+
+  uint16_t cur_sx = lsx_to_sx(lcur_sx);
+  uint16_t cur_sy = lsy_to_sy(lcur_sy);
+  uint16_t sx = lsx_to_sx(lsx);
+  DEBUG("From screen: %u,%u)\n", cur_sx, cur_sy);
+  DEBUG("To sx: %u\n", sx);
+
+  Log iscale = Log::pow2(13);
+  Log lm = Log(lsy * iscale - lcur_sy * iscale) /
+           Log(lsx * iscale - lcur_sx * iscale);
+  int16_t m = lm * Log::pow2(8);
+  DEBUG("m: %d\n", m);
+
+  // Adjust to the next pixel center.
+  int16_t offset = 128 - cur_sx % 256;
+  if (offset < 0)
+    offset += 256;
+  DEBUG("Offset: %d\n", offset);
+  if (offset) {
+    cur_sx += offset;
+    Log loffset = Log(offset);
+    if ((m >= 0 || cur_sy >= -m) &&
+        (m <= 0 || cur_sy <= screen_height * 256 - m))
+      cur_sy += lm * loffset;
+    DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
+  }
+
   bool off_screen = false;
-  for (; cur_px < px; ++cur_px) {
+  uint8_t px = s_to_p(sx);
+  for (uint8_t cur_px = s_to_p(cur_sx); cur_px < px; ++cur_px) {
     uint8_t cur_py = cur_sy / 256;
     if (cur_sy % 256 > 128)
       ++cur_py;

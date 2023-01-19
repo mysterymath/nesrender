@@ -20,15 +20,12 @@ static void draw_to(uint16_t x, uint16_t y);
 
 void overhead::render() {
   clear_screen();
-  //move_to(400, 400);
-  //draw_to(400, 600);
-  //draw_to(600, 600);
-  //draw_to(500, 500);
-  //draw_to(600, 400);
-  //draw_to(400, 400);
-
-  move_to(600, 600);
+  move_to(400, 400);
+  draw_to(400, 600);
+  draw_to(600, 600);
+  draw_to(500, 500);
   draw_to(600, 400);
+  draw_to(400, 400);
 }
 
 static void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
