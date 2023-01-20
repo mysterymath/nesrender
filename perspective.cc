@@ -77,7 +77,7 @@ static void move_to(uint16_t x, uint16_t y) {
 
 template <bool is_odd>
 void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
-                 uint8_t *col, uint8_t y_top, uint8_t y_bot);
+                 uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg);
 
 static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px);
 
@@ -407,6 +407,7 @@ static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
   for (; cur_px < px; ++cur_px, sz += zm) {
     uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
+    bool on_bg = col_z == 0xffff;
     if (sz >= col_z) {
       if (cur_px & 1)
         fb_col += 30;
@@ -415,10 +416,10 @@ static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
     col_z_lo[cur_px] = sz & 0xff;
     col_z_hi[cur_px] = sz >> 8;
     if (cur_px & 1) {
-      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px]);
+      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
       fb_col += 30;
     } else {
-      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px]);
+      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
     }
   }
 }
@@ -426,9 +427,9 @@ static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
 // Note: y_bot is exclusive.
 template <bool is_odd>
 void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
-                 uint8_t *col, uint8_t y_top, uint8_t y_bot) {
+                 uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg) {
   uint8_t i;
-  if (!ceil_color) {
+  if (!ceil_color && on_bg) {
     i = y_top / 2;
   } else {
     for (i = 0; i < y_top / 2; i++) {
@@ -453,7 +454,7 @@ void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
     }
     i++;
   }
-  if (!wall_color) {
+  if (!wall_color && on_bg) {
     i = y_bot / 2;
   } else {
     for (; i < y_bot / 2; i++) {
@@ -478,7 +479,7 @@ void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
     }
     i++;
   }
-  if (!floor_color)
+  if (!floor_color && on_bg)
     return;
   for (; i < screen_height / 2; i++) {
     if (is_odd) {
