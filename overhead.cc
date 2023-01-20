@@ -26,6 +26,12 @@ void overhead::render() {
   draw_to(500, 500);
   draw_to(600, 400);
   draw_to(400, 400);
+
+  move_to(430, 430);
+  draw_to(420, 420);
+  draw_to(430, 410);
+  draw_to(440, 420);
+  draw_to(430, 430);
 }
 
 static void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
