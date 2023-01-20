@@ -235,22 +235,20 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
     Log lcur_sx = Log(cur_cc_x) / Log(cur_cc_w);
     Log lsx = Log(cc_x) / Log(cc_w);
-
-    uint16_t w_near = 1;
-    uint16_t w_far = 65535;
+    uint16_t cur_sx = lsx_to_sx(lcur_sx);
+    uint16_t sx = lsx_to_sx(lsx);
 
     Log lcur_sz = -Log::one() / Log(cur_cc_w);
-    uint16_t cur_sz = lsz_to_sz(lcur_sz);
     Log lsz = -Log::one() / Log(cc_w);
-    Log iscale = Log::pow2(13);
-    DEBUG("cur_sz: %u, sz: %u\n", lsz_to_sz(lcur_sz), lsz_to_sz(lsz));
-    Log lzm = Log(lsz * iscale - lcur_sz * iscale) /
-              Log(lsx * iscale - lcur_sx * iscale);
-    // Increasing sx by one increases lsx by 1/2^5. This in turn increases lsz by m / 2^5
-    // This then increases sz by m / 2^5 * 2^16 = m * 2^11.
-    int16_t zm = lzm * Log::pow2(11);
 
-    draw_wall(s_to_p(lsx_to_sx(lcur_sx)), cur_sz, zm, s_to_p(lsx_to_sx(lsx)));
+    uint16_t cur_sz = lsz_to_sz(lcur_sz);
+    uint16_t sz = lsz_to_sz(lsz);
+
+    DEBUG("cur_sz: %u, sz: %u\n", lcur_sz, lsz);
+    int16_t zm = Log(sz - cur_sz) / Log(sx - cur_sx) * Log::pow2(8);
+    DEBUG("zm: %d\n", zm);
+
+    draw_wall(s_to_p(cur_sx), cur_sz, zm, s_to_p(sx));
   }
 
 done:
@@ -274,9 +272,7 @@ static uint16_t lsy_to_sy(Log lsy) {
     return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
 }
 
-static uint16_t lsz_to_sz(Log lsz) {
-  return (32768 + lsz * Log::pow2(15)) * 2;
-}
+static uint16_t lsz_to_sz(Log lsz) { return (32768 + lsz * Log::pow2(15)) * 2; }
 
 static uint8_t s_to_p(uint16_t s) {
   return s % 256 <= 128 ? s / 256 : s / 256 + 1;
@@ -364,12 +360,10 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
   uint16_t cur_sx = lsx_to_sx(lcur_sx);
   uint16_t cur_sy = lsy_to_sy(lcur_sy);
   uint16_t sx = lsx_to_sx(lsx);
-  DEBUG("From screen: %u,%u\n", cur_sx, cur_sy);
-  DEBUG("To sx: %u\n", sx);
+  uint16_t sy = lsy_to_sy(lsy);
+  DEBUG("Rasterize edge: (%u,%u) to (%u,%u)\n", cur_sx, cur_sy, sx, sy);
 
-  Log iscale = Log::pow2(13);
-  Log lm_denom = Log(lsx * iscale - lcur_sx * iscale);
-  Log lm = Log(lsy * iscale - lcur_sy * iscale) / lm_denom;
+  Log lm = Log(sy - cur_sy) / Log(sx - cur_sx);
   int16_t m = lm * Log::pow2(8);
   DEBUG("m: %d\n", m);
 
