@@ -2,6 +2,7 @@
 
 #include "screen.h"
 #include "util.h"
+#include "log.h"
 
 static uint16_t cur_x;
 static uint16_t cur_y;
@@ -17,13 +18,13 @@ void line_draw_to(uint8_t color, uint16_t to_x, uint16_t to_y) {
 
   bool x_major = abs(dx) >= abs(dy);
   if (x_major) {
-    dy = (int32_t)dy * 256 / abs(dx);
+    dy = Log(dy) / Log(dx).abs() * Log::pow2(8);
     if (dx > 0)
       dx = 1 * 256;
     else if (dx < 0)
       dx = -1 * 256;
   } else {
-    dx = (int32_t)dx * 256 / abs(dy);
+    dx = Log(dx) / Log(dy).abs() * Log::pow2(8);
     if (dy > 0)
       dy = 1 * 256;
     else if (dy < 0)

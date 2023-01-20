@@ -1,6 +1,7 @@
 #include "overhead.h"
 
 #include "draw.h"
+#include "log.h"
 #include "map.h"
 #include "screen.h"
 #include "trig.h"
@@ -9,17 +10,20 @@
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
 static uint16_t vc_width = 100;
-static uint16_t vc_width_recip = (uint32_t)65536 / vc_width;
-static uint16_t vc_height = vc_width * screen_height / screen_width;
+Log lvc_width = Log(false, 13607);
+static uint16_t vc_height = 94;
+constexpr Log lh_over_w(false, 191);
 
-// Percent
-constexpr uint16_t scale_speed = 10;
+constexpr Log scale_up_factor(false, -311);
+constexpr Log scale_down_factor(false, 281);
 
+static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
 void overhead::render() {
   clear_screen();
+  setup_camera();
   move_to(400, 400);
   draw_to(400, 600);
   draw_to(600, 600);
@@ -34,24 +38,32 @@ void overhead::render() {
   draw_to(430, 430);
 }
 
-static void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
+static Log lcamera_cos, lcamera_sin;
+static void setup_camera() {
+  // The player is facing up in the overhead view.
+  uint16_t ang = PI_OVER_2 - player.ang;
+  lcamera_cos = lcos(ang);
+  lcamera_sin = lsin(ang);
+}
+
+static void w_to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
 static bool on_screen(int16_t vc_x, int16_t vc_y);
 static bool line_visible(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
                          int16_t vc_y2);
 static void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x,
                  int16_t *clip_vc_y);
-static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *nsx, uint16_t *sy);
+static void vc_to_s(int16_t vc_x, int16_t vc_y, uint16_t *nsx, uint16_t *sy);
 
 static int16_t cur_vc_x;
 static int16_t cur_vc_y;
 static bool cur_on_screen;
 
 static void move_to(uint16_t x, uint16_t y) {
-  to_vc(x, y, &cur_vc_x, &cur_vc_y);
+  w_to_vc(x, y, &cur_vc_x, &cur_vc_y);
   if (on_screen(cur_vc_x, cur_vc_y)) {
     cur_on_screen = true;
     uint16_t sx, sy;
-    to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
+    vc_to_s(cur_vc_x, cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   } else {
     cur_on_screen = false;
@@ -60,7 +72,7 @@ static void move_to(uint16_t x, uint16_t y) {
 
 static void draw_to(uint16_t x, uint16_t y) {
   int16_t vc_x, vc_y;
-  to_vc(x, y, &vc_x, &vc_y);
+  w_to_vc(x, y, &vc_x, &vc_y);
 
   // If the current is on screen, the line is definitely visible.
   if (!cur_on_screen && !line_visible(vc_x, vc_y, cur_vc_x, cur_vc_y)) {
@@ -75,7 +87,7 @@ static void draw_to(uint16_t x, uint16_t y) {
   if (!cur_on_screen) {
     clip(vc_x, vc_y, &cur_vc_x, &cur_vc_y);
     uint16_t sx, sy;
-    to_screen(cur_vc_x, cur_vc_y, &sx, &sy);
+    vc_to_s(cur_vc_x, cur_vc_y, &sx, &sy);
     line_move_to(sx, sy);
   }
   if (!on_screen(vc_x, vc_y)) {
@@ -89,17 +101,15 @@ static void draw_to(uint16_t x, uint16_t y) {
   cur_vc_y = unclipped_vc_y;
 
   uint16_t sx, sy;
-  to_screen(vc_x, vc_y, &sx, &sy);
+  vc_to_s(vc_x, vc_y, &sx, &sy);
   line_draw_to(3, sx, sy);
 }
 
-void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
-  int16_t tx = x - player.x;
-  int16_t ty = y - player.y;
-  // The player is facing up in the overhead view.
-  uint16_t ang = PI_OVER_2 - player.ang;
-  *vc_x = mul_cos(ang, tx) - mul_sin(ang, ty);
-  *vc_y = mul_sin(ang, tx) + mul_cos(ang, ty);
+void w_to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
+  Log ltx = x - player.x;
+  Log lty = y - player.y;
+  *vc_x = lcamera_cos * ltx - lcamera_sin * lty;
+  *vc_y = -lcamera_sin * ltx - lcamera_cos * lty;
 }
 
 static bool on_screen(int16_t vc_x, int16_t vc_y) {
@@ -129,41 +139,39 @@ static void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x,
   int16_t x_bound = vc_width;
   int16_t y_bound = vc_height;
 
-  int32_t dy = *clip_vc_y - vc_y;
-  int32_t dx = *clip_vc_x - vc_x;
+  Log lm = Log(*clip_vc_y - vc_y) / Log(*clip_vc_x - vc_x);
   if (*clip_vc_x < -x_bound) {
-    *clip_vc_y += (-x_bound - *clip_vc_x) * dy / dx;
+    *clip_vc_y += Log(-x_bound - *clip_vc_x) * lm;
     *clip_vc_x = -x_bound;
   }
   if (*clip_vc_x > x_bound) {
-    *clip_vc_y -= (*clip_vc_x - x_bound) * dy / dx;
+    *clip_vc_y -= Log(*clip_vc_x - x_bound) * lm;
     *clip_vc_x = x_bound;
   }
   if (*clip_vc_y < -y_bound) {
-    *clip_vc_x += (-y_bound - *clip_vc_y) * dx / dy;
+    *clip_vc_x += Log(-y_bound - *clip_vc_y) / lm;
     *clip_vc_y = -y_bound;
   }
   if (*clip_vc_y > y_bound) {
-    *clip_vc_x -= (*clip_vc_y - y_bound) * dx / dy;
+    *clip_vc_x -= Log(*clip_vc_y - y_bound) / lm;
     *clip_vc_y = y_bound;
   }
 }
 
-static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy) {
-  *sx = ((int32_t)vc_x * 256 * screen_width / 2 * vc_width_recip >> 16) +
-        screen_width / 2 * 256 + screen_guard;
-  *sy = screen_height / 2 * 256 -
-        ((int32_t)vc_y * 256 * screen_width / 2 * vc_width_recip >> 16) +
-        screen_guard;
+static void vc_to_s(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy) {
+  Log lsx = Log(vc_x) / lvc_width;
+  Log lsy = Log(vc_y) / lvc_width;
+  *sx = lsx * Log::pow2(13) + screen_width / 2 * 256 + screen_guard;
+  *sy = lsy * Log::pow2(13) + screen_width / 2 * 256 + screen_guard;
 }
 
 void overhead::scale_up() {
-  vc_width = (uint32_t)vc_width * (100 - scale_speed) / 100;
-  vc_width_recip = (uint32_t)65536 / vc_width;
-  vc_height = vc_width * screen_height / screen_width;
+  lvc_width *= scale_up_factor;
+  vc_width = lvc_width;
+  vc_height = lvc_width * lh_over_w;
 }
 void overhead::scale_down() {
-  vc_width = (uint32_t)vc_width * (100 + scale_speed) / 100;
-  vc_width_recip = (uint32_t)65536 / vc_width;
-  vc_height = vc_width * screen_height / screen_width;
+  lvc_width *= scale_down_factor;
+  vc_width = lvc_width;
+  vc_height = lvc_width * lh_over_w;
 }
