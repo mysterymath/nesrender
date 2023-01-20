@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "log.h"
+
 struct Player {
   uint16_t x = 500;
   uint16_t y = 500;
@@ -18,7 +20,7 @@ struct Player {
   void strafe_left();
   void strafe_right();
 
-  static constexpr uint16_t speed = 5;
+  static constexpr Log lspeed = Log(false, 4755);
   static constexpr uint16_t ang_speed = 1024;
 };
 

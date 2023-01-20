@@ -5,20 +5,20 @@
 Player player;
 
 void Player::forward() {
-  x += mul_cos(ang, speed);
-  y += mul_sin(ang, speed);
+  x += lcos(ang) * lspeed;
+  y += lsin(ang) * lspeed;
 }
 void Player::backward() {
-  x += mul_cos(ang + PI, speed);
-  y += mul_sin(ang + PI, speed);
+  x -= lcos(ang) * lspeed;
+  y -= lsin(ang) * lspeed;
 }
 void Player::turn_left() { ang += ang_speed; }
 void Player::turn_right() { ang -= ang_speed; }
 void Player::strafe_left() {
-  x += mul_cos(ang + PI_OVER_2, speed);
-  y += mul_sin(ang + PI_OVER_2, speed);
+  x += lcos(ang + PI_OVER_2) * lspeed;
+  y += lsin(ang + PI_OVER_2) * lspeed;
 }
 void Player::strafe_right() {
-  x += mul_cos(ang - PI_OVER_2, speed);
-  y += mul_sin(ang - PI_OVER_2, speed);
+  x -= lcos(ang + PI_OVER_2) * lspeed;
+  y -= lsin(ang + PI_OVER_2) * lspeed;
 }
