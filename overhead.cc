@@ -21,12 +21,17 @@ static void draw_to(uint16_t x, uint16_t y);
 void overhead::render() {
   clear_screen();
   move_to(400, 400);
-  move_to(400, 400);
   draw_to(400, 600);
   draw_to(600, 600);
   draw_to(500, 500);
   draw_to(600, 400);
   draw_to(400, 400);
+
+  move_to(430, 430);
+  draw_to(420, 420);
+  draw_to(430, 410);
+  draw_to(440, 420);
+  draw_to(430, 430);
 }
 
 static void to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y);
@@ -35,7 +40,7 @@ static bool line_visible(int16_t vc_x1, int16_t vc_y1, int16_t vc_x2,
                          int16_t vc_y2);
 static void clip(int16_t vc_x, int16_t vc_y, int16_t *clip_vc_x,
                  int16_t *clip_vc_y);
-static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *sx, uint16_t *sy);
+static void to_screen(int16_t vc_x, int16_t vc_y, uint16_t *nsx, uint16_t *sy);
 
 static int16_t cur_vc_x;
 static int16_t cur_vc_y;

@@ -17,9 +17,6 @@ def approx(n):
 		m += 1
 		n <<= 1
 
-	# Round to high 9 bits (a known 1 bit, followed by 8 variable bits)
-	n &= 0xff80
-
 	# n = n' / 2^m
 	# log n = log n' - m
 	l = math.log2(n) - m
@@ -28,17 +25,17 @@ def approx(n):
 	# back = 2 ** (w + f / 2**10)  = 2**(f/2**10) * 2**w
 	# back = 2*(f/2**10) << w
 
-	l *= 2**10
+	l *= 2**11
 	l = round(l)
-	back = l / 2**10
+	back = l / 2**11
 	back = round(2**back)
 	print(orig_n, n, m, l, back)
+	return back
 
-#errs = []
+errs = []
 for i in range(1, 65536):
-	approx(i)
-	#errs.append(approx(i) - i)
+	errs.append(approx(i) - i)
 
-#print('Mean error:', np.mean(errs))
-#print('Mean abs error:', np.mean(np.abs(errs)))
-#print('Std dev error:', np.std(errs))
+print('Mean error:', np.mean(errs))
+print('Mean abs error:', np.mean(np.abs(errs)))
+print('Std dev error:', np.std(errs))

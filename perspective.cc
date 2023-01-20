@@ -2,8 +2,10 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "draw.h"
+#include "log.h"
 #include "map.h"
 #include "screen.h"
 #include "trig.h"
@@ -14,358 +16,504 @@
 //#define DEBUG_FILE
 #include "debug.h"
 
+#define DEBUG_CC(PREFIX, NAME)                                                 \
+  DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
+        NAME##_w)
+
+static void clear_col_z();
+static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
-  clear_z();
+  clear_col_z();
+
+  setup_camera();
   move_to(400, 400);
   draw_to(400, 600);
   draw_to(600, 600);
   draw_to(500, 500);
   draw_to(600, 400);
   draw_to(400, 400);
+
+  move_to(430, 430);
+  draw_to(420, 420);
+  draw_to(430, 410);
+  draw_to(440, 420);
+  draw_to(430, 430);
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
 static void z_to_cc(uint16_t z, int16_t *cc_y);
-static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                      int16_t cc_w, uint16_t *sx, uint16_t *sy_top,
-                      uint16_t *sy_bot, uint16_t *sz);
-static bool in_frustum(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w);
-static bool wall_on_screen(int16_t cc_x1, int16_t cc_y_top1, int16_t cc_y_bot1,
-                           int16_t cc_w1, int16_t cc_x2, int16_t cc_y_top2,
-                           int16_t cc_y_bot2, int16_t cc_w2);
 
 static int16_t cur_cc_x;
 static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
-static bool cur_on_screen;
 
 constexpr int16_t wall_top_z = 80;
 constexpr int16_t wall_bot_z = 20;
 
-static void update_cur();
+static uint8_t col_z_lo[screen_width];
+static uint8_t col_z_hi[screen_width];
 
-#define DEBUG_CC(PREFIX, NAME)                                                 \
-  DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
-        NAME##_w)
+static void clear_col_z() {
+  memset(col_z_lo, 0xff, sizeof col_z_lo);
+  memset(col_z_hi, 0xff, sizeof col_z_hi);
+}
 
-#define DEBUG_SCREEN(PREFIX)                                                   \
-  DEBUG("%s: (%d:%d,[%d:%d,%d:%d],%u)\n", PREFIX, (int16_t)sx / 256 - 5,       \
-        sx % 256, (int16_t)sy_top / 256 - 5, sy_top % 256,                     \
-        (int16_t)sy_bot / 256 - 5, sy_bot % 256, sz)
+static Log lcamera_cos, lcamera_sin;
+static void setup_camera() {
+  lcamera_cos = lcos(-player.ang);
+  lcamera_sin = lsin(-player.ang);
+}
+
+// 64/60
+constexpr Log lw_over_h(false, 191);
+
+// 60/2*256
+constexpr Log lh_over_2_times_256(false, 26433);
 
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
   xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
   z_to_cc(wall_top_z, &cur_cc_y_top);
   z_to_cc(wall_bot_z, &cur_cc_y_bot);
-  update_cur();
+  DEBUG_CC("Moved to CC:", cur_cc);
 }
 
-static void update_cur() {
-  DEBUG_CC("Update cur", cur_cc);
-  DEBUG("\n");
-  if (in_frustum(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w)) {
-    DEBUG("In frustum.\n");
-    uint16_t sx, sy_top, sy_bot, sz;
-    to_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, &sx, &sy_top,
-              &sy_bot, &sz);
+template <bool is_odd>
+void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
+                 uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg);
 
-    DEBUG_SCREEN("Screen: ");
-    wall_move_to(sx, sy_top, sy_bot, sz);
-    cur_on_screen = true;
-  } else {
-    DEBUG("Not in frustum.\n");
-    cur_on_screen = false;
-  }
-}
+static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px);
 
-static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w);
+static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
+                                 int16_t cc_y_top, int16_t cc_y_bot,
+                                 int16_t cc_w);
 
-static void draw_to(uint16_t x, uint16_t y) {
+static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
+                                    int16_t cur_cc_y, int16_t cur_cc_w,
+                                    int16_t cc_x, int16_t cc_y, int16_t cc_w);
+static void rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
+                           int16_t cur_cc_w, int16_t cc_x, int16_t cc_y,
+                           int16_t cc_w);
+
+static uint16_t lsx_to_sx(Log lsx);
+static uint16_t lsy_to_sy(Log lsy);
+static uint16_t lsz_to_sz(Log lsy);
+
+static uint8_t s_to_p(uint16_t s);
+
+static uint8_t py_tops[64];
+static uint8_t py_bots[64];
+
+__attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   DEBUG("Draw to: (%u,%u)\n", x, y);
 
   int16_t cc_x, cc_w;
   xy_to_cc(x, y, &cc_x, &cc_w);
+
   int16_t cc_y_top, cc_y_bot;
   z_to_cc(wall_top_z, &cc_y_top);
   z_to_cc(wall_bot_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
 
-  if (!wall_on_screen(cur_cc_x, cur_cc_y_top, cur_cc_y_bot, cur_cc_w, cc_x,
-                      cc_y_top, cc_y_bot, cc_w)) {
-    cur_cc_x = cc_x;
-    cur_cc_y_top = cc_y_top;
-    cur_cc_y_bot = cc_y_bot;
-    cur_cc_w = cc_w;
-    cur_on_screen = false;
-    DEBUG("Wall entirely outside frustum. Culled.\n");
-    return;
+  int16_t orig_cc_x = cc_x;
+  int16_t orig_cc_y_top = cc_y_top;
+  int16_t orig_cc_y_bot = cc_y_bot;
+  int16_t orig_cc_w = cc_w;
+
+  bool cur_left_of_left = cur_cc_x < -cur_cc_w;
+  bool cur_right_of_right = cur_cc_x > cur_cc_w;
+  bool left_of_left = cc_x < -cc_w;
+  bool right_of_right = cc_x > cc_w;
+
+  // There is homogeneous weirdness when both w are zero. Disallow.
+  if (cc_w <= 0 && cur_cc_w <= 0)
+    goto done;
+
+  {
+    if (cur_left_of_left && left_of_left ||
+        cur_right_of_right && right_of_right) {
+      DEBUG("LR frustum cull round 1: %d %d\n",
+            cur_left_of_left && left_of_left,
+            cur_right_of_right && right_of_right);
+      goto done;
+    }
+
+    // Negative w can cause naive frustum culling not to work due to a litany of
+    // corner cases, so clip to w=1 (no division by zero please) and cull again.
+    if (cur_cc_w < 1 || cc_w < 1) {
+      int16_t dx = cc_x - cur_cc_x;
+      int16_t dy_top = cc_y_top - cur_cc_y_top;
+      int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
+      int16_t dw = cc_w - cur_cc_w;
+      Log ldx = dx;
+      Log ldy_top = dy_top;
+      Log ldy_bot = dy_bot;
+      Log ldw = dw;
+
+      if (cur_cc_w < 1) {
+        // w = 1 = cur_w + dw*t
+        Log t = Log(1 - cur_cc_w) / ldw;
+        cur_cc_x += ldx * t;
+        cur_cc_y_top += ldy_top * t;
+        cur_cc_y_bot += ldy_bot * t;
+        cur_cc_w = 1;
+        cur_left_of_left = cur_cc_x < -cur_cc_w;
+        cur_right_of_right = cur_cc_x > cur_cc_w;
+        DEBUG("Clipped cur to w=1.\n");
+        DEBUG_CC("Cur", cur_cc);
+      } else {
+        Log t = Log(1 - cc_w) / ldw;
+        cc_x += ldx * t;
+        cc_y_top += ldy_top * t;
+        cc_y_bot += ldy_bot * t;
+        cc_w = 1;
+        left_of_left = cc_x < -cc_w;
+        right_of_right = cc_x > cc_w;
+        DEBUG("Clipped next to w=1.\n");
+        DEBUG_CC("Next", cc);
+      }
+
+      if (cur_left_of_left && left_of_left ||
+          cur_right_of_right && right_of_right) {
+        DEBUG("LR frustum cull round 2: %d %d\n",
+              cur_left_of_left && left_of_left,
+              cur_right_of_right && right_of_right);
+        goto done;
+      }
+    }
+
+    if (Log(cur_cc_x) / Log(cur_cc_w) >= Log(cc_x) / Log(cc_w)) {
+      DEBUG("Backface cull.\n");
+      goto done;
+    }
+
+    // Note that the logarithmic sx values range from [-1, 1], while the
+    // unsigned values range from [0, screen_width*256].
+
+    if (cur_left_of_left || right_of_right) {
+      int16_t dx = cc_x - cur_cc_x;
+      int16_t dy_top = cc_y_top - cur_cc_y_top;
+      int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
+      int16_t dw = cc_w - cur_cc_w;
+      Log ldx = dx;
+      Log ldy_top = dy_top;
+      Log ldy_bot = dy_bot;
+      Log ldw = dw;
+
+      if (cur_left_of_left) {
+        DEBUG("Wall crosses left frustum edge. Clipping.\n");
+        DEBUG_CC("Cur", cur_cc);
+        DEBUG_CC("Next", cc);
+        // r(t) = cur + vt
+        // r(t)_x = -r(t)_w
+        // cur_x + dxt = -cur_w - dw*t;
+        // t*(dx + dw) = -cur_w - cur_x
+        // t = (-cur_w - cur_x) / (dx + dw)
+        // Since the wall cannot be parallel to the left frustum edge, dw + dx
+        // != 0.
+        Log t = Log(-cur_cc_w - cur_cc_x) / Log(dx + dw);
+        cur_cc_x += ldx * t;
+        cur_cc_y_top += ldy_top * t;
+        cur_cc_y_bot += ldy_bot * t;
+        cur_cc_w = -cur_cc_x;
+        DEBUG_CC("Clipped Cur", cur_cc);
+      }
+      if (right_of_right) {
+        DEBUG("Wall crosses right frustum edge. Clipping.\n");
+        DEBUG_CC("Cur", cur_cc);
+        DEBUG_CC("Next", cc);
+        Log t = Log(cc_w - cc_x) / Log(dx - dw);
+        cc_x += ldx * t;
+        cc_y_top += ldy_top * t;
+        cc_y_bot += ldy_bot * t;
+        cc_w = cc_x;
+        DEBUG_CC("Clipped Next", cc);
+      }
+    }
+
+    clip_and_rasterize_edge(py_tops, cur_cc_x, cur_cc_y_top, cur_cc_w, cc_x,
+                            cc_y_top, cc_w);
+    clip_and_rasterize_edge(py_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cc_x,
+                            cc_y_bot, cc_w);
+
+    Log lcur_sx = Log(cur_cc_x) / Log(cur_cc_w);
+    Log lsx = Log(cc_x) / Log(cc_w);
+    uint16_t cur_sx = lsx_to_sx(lcur_sx);
+    uint16_t sx = lsx_to_sx(lsx);
+
+    Log lcur_sz = -Log::one() / Log(cur_cc_w);
+    Log lsz = -Log::one() / Log(cc_w);
+
+    uint16_t cur_sz = lsz_to_sz(lcur_sz);
+    uint16_t sz = lsz_to_sz(lsz);
+
+    DEBUG("cur_sz: %u, sz: %u\n", lcur_sz, lsz);
+    int16_t zm = Log(sz - cur_sz) / Log(sx - cur_sx) * Log::pow2(8);
+    DEBUG("zm: %d\n", zm);
+
+    draw_wall(s_to_p(cur_sx), cur_sz, zm, s_to_p(sx));
   }
 
-  draw_to_cc(cc_x, cc_y_top, cc_y_bot, cc_w);
-  cur_cc_x = cc_x;
-  cur_cc_y_top = cc_y_top;
-  cur_cc_y_bot = cc_y_bot;
-  cur_cc_w = cc_w;
-  update_cur();
+done:
+  cur_cc_x = orig_cc_x;
+  cur_cc_y_top = orig_cc_y_top;
+  cur_cc_y_bot = orig_cc_y_bot;
+  cur_cc_w = orig_cc_w;
 }
 
-static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                         int16_t cc_w);
+static uint16_t lsx_to_sx(Log lsx) {
+  if (lsx.abs() == Log::one())
+    return lsx.sign ? 0 : screen_width * 256;
+  else
+    return lsx * Log::pow2(13) + screen_width / 2 * 256;
+}
 
-static void draw_to_cc(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w) {
-  DEBUG_CC("Draw to cc", cc);
-  bool on_screen = in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w);
-  DEBUG("%s frustum\n", on_screen ? "In" : "Not in");
-  if (cur_on_screen && on_screen) {
-    uint16_t sx, sy_top, sy_bot, sz;
-    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot, &sz);
-    DEBUG_SCREEN("Screen:");
-    wall_draw_to(1, sx, sy_top, sy_bot, sz);
+static uint16_t lsy_to_sy(Log lsy) {
+  if (lsy.abs() == Log::one())
+    return lsy.sign ? 0 : screen_height * 256;
+  else
+    return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
+}
+
+static uint16_t lsz_to_sz(Log lsz) { return (32768 + lsz * Log::pow2(15)) * 2; }
+
+static uint8_t s_to_p(uint16_t s) {
+  return s % 256 <= 128 ? s / 256 : s / 256 + 1;
+}
+
+static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
+                                    int16_t cur_cc_y, int16_t cur_cc_w,
+                                    int16_t cc_x, int16_t cc_y, int16_t cc_w) {
+  bool cur_above_top = cur_cc_y < -cur_cc_w;
+  bool cur_below_bot = cur_cc_y > cur_cc_w;
+  bool above_top = cc_y < -cc_w;
+  bool below_bot = cc_y > cc_w;
+
+  if (!cur_above_top && !cur_below_bot && !above_top && !below_bot) {
+    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, cc_x, cc_y, cc_w);
+  } else if (cur_above_top && above_top) {
+    DEBUG("Clipped both sides to top.\n");
+    clip_and_rasterize_edge(edge, cur_cc_x, -cur_cc_w, cur_cc_w, cc_x, -cc_w,
+                            cc_w);
+  } else if (cur_below_bot && below_bot) {
+    DEBUG("Clipped both sides to bot.\n");
+    clip_and_rasterize_edge(edge, cur_cc_x, cur_cc_w, cur_cc_w, cc_x, cc_w,
+                            cc_w);
   } else {
-    draw_clipped(cc_x, cc_y_top, cc_y_bot, cc_w);
-  }
+    int16_t dx = cc_x - cur_cc_x;
+    int16_t dy = cc_y - cur_cc_y;
+    int16_t dw = cc_w - cur_cc_w;
 
-  // Note: This may be clipped, and is set for the benefit of a later draw_to_cc
-  // call that is part of the same logical wall, not for the benefit of the next
-  // draw_to.
-  cur_cc_x = cc_x;
-  cur_cc_y_top = cc_y_top;
-  cur_cc_y_bot = cc_y_bot;
-  cur_cc_w = cc_w;
-  cur_on_screen = on_screen;
+    int16_t isect_cc_x;
+    int16_t isect_cc_y;
+    int16_t isect_cc_w;
+    if (cur_above_top || above_top) {
+      DEBUG("Clipped to top.\n");
+      // r(t) = cur + vt
+      // r(t)_y = -r(t)_w
+      // cur_y + dyt = -cur_w - dw*t;
+      // t*(dy + dw) = -cur_w - cur_y
+      // t = (-cur_w - cur_y) / (dy + dw)
+      Log t = Log(-cur_cc_w - cur_cc_y) / Log(dy + dw);
+      isect_cc_x = cur_cc_x + Log(dx) * t;
+      isect_cc_y = cur_cc_y + Log(dy) * t;
+      isect_cc_w = -isect_cc_y;
+    } else {
+      DEBUG("Clipped to bot.\n");
+      // r(t) = cur + vt
+      // r(t)_y = r(t)_w
+      // cur_y + dyt = cur_w + dw*t;
+      // t*(dy - dw) = cur_w - cur_y
+      // t = (cur_w - cur_y) / (dy - dw)
+      Log t = Log(cur_cc_w - cur_cc_y) / Log(dy - dw);
+      isect_cc_x = cur_cc_x + Log(dx) * t;
+      isect_cc_y = cur_cc_y + Log(dy) * t;
+      isect_cc_w = isect_cc_y;
+    }
+    DEBUG("isect: (%d,%d,%d)\n", isect_cc_x, isect_cc_y, isect_cc_w);
+    if (cur_above_top || cur_below_bot) {
+      DEBUG("Clipped left side of edge.\n");
+      clip_and_rasterize_edge(edge, cur_cc_x,
+                              cur_above_top ? -cur_cc_w : cur_cc_w, cur_cc_w,
+                              isect_cc_x, isect_cc_y, isect_cc_w);
+      clip_and_rasterize_edge(edge, isect_cc_x, isect_cc_y, isect_cc_w, cc_x,
+                              cc_y, cc_w);
+    } else {
+      DEBUG("Clipped right side of edge.\n");
+      clip_and_rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, isect_cc_x,
+                              isect_cc_y, isect_cc_w);
+      clip_and_rasterize_edge(edge, isect_cc_x, isect_cc_y, isect_cc_w, cc_x,
+                              above_top ? -cc_w : cc_w, cc_w);
+    }
+  }
 }
 
-static void draw_clipped(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                         int16_t cc_w) {
-  int16_t dx = cc_x - cur_cc_x;
-  int16_t dy_top = cc_y_top - cur_cc_y_top;
-  int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
-  int16_t dw = cc_w - cur_cc_w;
+__attribute__((noinline)) static void
+rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
+               int16_t cur_cc_w, int16_t cc_x, int16_t cc_y, int16_t cc_w) {
+  Log lcur_cc_w = cur_cc_w;
+  Log lcc_w = cc_w;
 
-  if (cur_cc_x < -cur_cc_w) {
-    DEBUG("Wall crosses left frustum edge from left to right. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    // r(t) = cur + vt
-    // w(t)_x = -w(t)_w
-    // cur_x + dxt = -cur_w - dw*t;
-    // t*(dx + dw) = -cur_w - cur_x
-    // t = (-cur_w - cur_x) / (dx + dw)
-    // Since the wall cannot be parallel to the left frustum edge, dw + dx !=
-    // 0.
-    int16_t t_num = -cur_cc_w - cur_cc_x;
-    int16_t t_denom = dx + dw;
-    cur_cc_x += (int32_t)dx * t_num / t_denom;
-    cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cur_cc_w = -cur_cc_x;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-  } else if (cc_x < -cc_w) {
-    DEBUG("Wall crosses left frustum edge from right to left. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    int16_t t_num = -cc_w - cc_x;
-    int16_t t_denom = dx + dw;
-    cc_x += (int32_t)dx * t_num / t_denom;
-    cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cc_w = -cc_x;
-    DEBUG_CC("Clipped Next", cc);
+  Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
+  Log lcur_sy = Log(cur_cc_y) / lcur_cc_w;
+
+  Log lsx = Log(cc_x) / lcc_w;
+  Log lsy = Log(cc_y) / lcc_w;
+
+  uint16_t cur_sx = lsx_to_sx(lcur_sx);
+  uint16_t cur_sy = lsy_to_sy(lcur_sy);
+  uint16_t sx = lsx_to_sx(lsx);
+  uint16_t sy = lsy_to_sy(lsy);
+  DEBUG("Rasterize edge: (%u,%u) to (%u,%u)\n", cur_sx, cur_sy, sx, sy);
+
+  Log lm = Log(sy - cur_sy) / Log(sx - cur_sx);
+  int16_t m = lm * Log::pow2(8);
+  DEBUG("m: %d\n", m);
+
+  // Adjust to the next pixel center.
+  int16_t offset = 128 - cur_sx % 256;
+  if (offset < 0)
+    offset += 256;
+  DEBUG("Offset: %d\n", offset);
+  if (offset) {
+    cur_sx += offset;
+    Log loffset = Log(offset);
+    if ((m >= 0 || cur_sy >= -m) &&
+        (m <= 0 || cur_sy <= screen_height * 256 - m))
+      cur_sy += lm * loffset;
+    DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
   }
-  if (cur_cc_x > cur_cc_w) {
-    DEBUG("Wall crosses right frustum edge from right to left. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    // r(t) = cur + vt
-    // r(t)_x = r(t)_w
-    // cur_x + dx*t = cur_w + dw*t;
-    // t*(dx - dw) = cur_w - cur_x
-    // t = (cur_w - cur_x) / (dx - dw)
-    // Since the wall cannot be parallel to the right frustum edge, dx - dw !=
-    // 0.
-    int16_t t_num = cur_cc_w - cur_cc_x;
-    int16_t t_denom = dx - dw;
-    cur_cc_x += (int32_t)dx * t_num / t_denom;
-    cur_cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cur_cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cur_cc_w = cur_cc_x;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-  } else if (cc_x > cc_w) {
-    DEBUG("Wall crosses right frustum edge from left to right. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-    int16_t t_num = cc_w - cc_x;
-    int16_t t_denom = dx - dw;
-    cc_x += (int32_t)dx * t_num / t_denom;
-    cc_y_top += (int32_t)dy_top * t_num / t_denom;
-    cc_y_bot += (int32_t)dy_bot * t_num / t_denom;
-    cc_w = cc_x;
-    DEBUG_CC("Clipped Next", cc);
-  }
-  if (cur_cc_y_top > cur_cc_w && cc_y_top > cc_w) {
-    DEBUG("Wall left and right edge cross frustum top. Clipping.\n");
 
-    DEBUG_CC("Cur", cur_cc);
-    cur_cc_y_top = cur_cc_w;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-
-    DEBUG_CC("Next", cc);
-    cc_y_top = cc_w;
-    DEBUG_CC("Clipped Next", cc);
-  } else if (cur_cc_y_top > cur_cc_w || cc_y_top > cc_w) {
-    DEBUG("Wall top edge crosses frustum top. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-
-    // r(t) = cur + vt
-    // r(t)_y = r(t)_w
-    // cur_y + dyt = cur_w + dwt
-    // t = (cur_w - cur_y) / (dy - dw)
-    int16_t t_num = cur_cc_w - cur_cc_y_top;
-    int16_t t_denom = dy_top - dw;
-    int16_t isect_cc_x = cur_cc_x + (int32_t)dx * t_num / t_denom;
-    int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
-    int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
-    int16_t isect_cc_w = isect_cc_y_top;
-    DEBUG_CC("Intersection", isect_cc);
-    if (cur_cc_y_top > cur_cc_w) {
-      cur_cc_y_top = cur_cc_w;
-      DEBUG_CC("Clipped Cur:", cur_cc);
-      update_cur();
-    } else {
-      cc_y_top = cc_w;
-      DEBUG_CC("Clipped Next:", cc);
+  bool off_screen = false;
+  uint8_t px = s_to_p(sx);
+  for (uint8_t cur_px = s_to_p(cur_sx); cur_px < px; ++cur_px) {
+    uint8_t cur_py = cur_sy / 256;
+    if (cur_sy % 256 > 128)
+      ++cur_py;
+    edge[cur_px] = cur_py;
+    if (!off_screen) {
+      if (m < 0 && cur_sy < -m) {
+        off_screen = true;
+        cur_sy = 0;
+      } else if (m > 0 && cur_sy > (int16_t)(screen_height * 256) - m) {
+        off_screen = true;
+        cur_sy = screen_height * 256;
+      } else {
+        cur_sy += m;
+      }
     }
-    draw_to_cc(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
   }
-  if (cur_cc_y_bot < -cur_cc_w && cc_y_bot < -cc_w) {
-    DEBUG("Wall left and right edge cross frustum bottom. Clipping.\n");
+}
 
-    DEBUG_CC("Cur", cur_cc);
-    cur_cc_y_bot = -cur_cc_w;
-    DEBUG_CC("Clipped Cur", cur_cc);
-    update_cur();
-
-    DEBUG_CC("Next", cc);
-    cc_y_bot = -cc_w;
-    DEBUG_CC("Clipped Next", cc);
-  } else if (cur_cc_y_bot < -cur_cc_w || cc_y_bot < -cc_w) {
-    DEBUG("Wall bottom edge crosses frustum bottom. Clipping.\n");
-    DEBUG_CC("Cur", cur_cc);
-    DEBUG_CC("Next", cc);
-
-    // r(t) = cur + vt
-    // r(t)_y = -r(t)_w
-    // cur_y + dyt = -cur_w - dwt
-    // t = (-cur_w - cur_y) / (dy + dw)
-    int16_t t_num = -cur_cc_w - cur_cc_y_bot;
-    int16_t t_denom = dy_bot + dw;
-    int16_t isect_cc_x = cur_cc_x + (int32_t)dx * t_num / t_denom;
-    int16_t isect_cc_y_top = cur_cc_y_top + (int32_t)dy_top * t_num / t_denom;
-    int16_t isect_cc_y_bot = cur_cc_y_bot + (int32_t)dy_bot * t_num / t_denom;
-    int16_t isect_cc_w = -isect_cc_y_bot;
-    DEBUG_CC("Intersection", isect_cc);
-
-    if (cur_cc_y_bot < -cur_cc_w) {
-      cur_cc_y_bot = -cur_cc_w;
-      DEBUG_CC("Clipped Cur:", cur_cc);
-      update_cur();
-    } else {
-      cc_y_bot = -cc_w;
-      DEBUG_CC("Clipped Next:", cc);
+static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
+  DEBUG("x: [%d,%d), sz: %u, zm: %d\n", cur_px, px, sz, zm);
+  uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
+  for (; cur_px < px; ++cur_px, sz += zm) {
+    uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
+    bool on_bg = col_z == 0xffff;
+    if (sz >= col_z) {
+      if (cur_px & 1)
+        fb_col += 30;
+      continue;
     }
-    draw_to_cc(isect_cc_x, isect_cc_y_top, isect_cc_y_bot, isect_cc_w);
+    col_z_lo[cur_px] = sz & 0xff;
+    col_z_hi[cur_px] = sz >> 8;
+    if (cur_px & 1) {
+      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px],
+                        on_bg);
+      fb_col += 30;
+    } else {
+      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px],
+                         on_bg);
+    }
   }
-  if (in_frustum(cc_x, cc_y_top, cc_y_bot, cc_w)) {
-    DEBUG("Next in frustum.\n");
-    uint16_t sx, sy_top, sy_bot, sz;
-    to_screen(cc_x, cc_y_top, cc_y_bot, cc_w, &sx, &sy_top, &sy_bot, &sz);
-    DEBUG_SCREEN("Screen");
-    if (cur_on_screen)
-      wall_draw_to(1, sx, sy_top, sy_bot, sz);
-    else
-      wall_move_to(sx, sy_top, sy_bot, sz);
+}
+
+// Note: y_bot is exclusive.
+template <bool is_odd>
+void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
+                 uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg) {
+  uint8_t i;
+  if (!ceil_color && on_bg) {
+    i = y_top / 2;
+  } else {
+    for (i = 0; i < y_top / 2; i++) {
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] &= ceil_color << 6 | ceil_color << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] &= ceil_color << 2 | ceil_color;
+      }
+    }
+  }
+  if (i == screen_height / 2)
+    return;
+  if (y_bot != y_top && y_top & 1) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= wall_color << 6 | ceil_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= wall_color << 2 | ceil_color;
+    }
+    i++;
+  }
+  if (!wall_color && on_bg) {
+    i = y_bot / 2;
+  } else {
+    for (; i < y_bot / 2; i++) {
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] |= wall_color << 6 | wall_color << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] |= wall_color << 2 | wall_color;
+      }
+    }
+  }
+  if (i == screen_height / 2)
+    return;
+  if (y_bot != y_top && y_bot & 1) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= floor_color << 6 | wall_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= floor_color << 2 | wall_color;
+    }
+    i++;
+  }
+  if (!floor_color && on_bg)
+    return;
+  for (; i < screen_height / 2; i++) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= floor_color << 6 | floor_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= floor_color << 2 | floor_color;
+    }
   }
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
-  int16_t tx = x - player.x;
-  int16_t ty = y - player.y;
-  int16_t vx = mul_cos(-player.ang, tx) - mul_sin(-player.ang, ty);
-  int16_t vy = mul_sin(-player.ang, tx) + mul_cos(-player.ang, ty);
+  Log ltx = x - player.x;
+  Log lty = y - player.y;
+  int16_t vx = lcamera_cos * ltx - lcamera_sin * lty;
+  int16_t vy = lcamera_sin * ltx + lcamera_cos * lty;
   *cc_x = -vy;
   *cc_w = vx;
 }
 
 static void z_to_cc(uint16_t z, int16_t *cc_y) {
-  int16_t vz = z - player.z;
-  // The frustum's top world coordinate is z = kx, for some k.
-  // The frustum's left world coordinate is y = x.
-  // When the frustum is 2w wide, y = x = w. Then the frustum must be 2h tall,
-  // and z = kx = h. So kw = h, and k = h/w.
-  // The line z=h/wx should map to (1,1), so scale by the inverse factor.
-  *cc_y = vz * (int32_t)screen_width / screen_height;
-}
-
-static void to_screen(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                      int16_t cc_w, uint16_t *sx, uint16_t *sy_top,
-                      uint16_t *sy_bot, uint16_t *sz) {
-  *sx = (int32_t)cc_x * (screen_width / 2) * 256 / cc_w +
-        screen_width / 2 * 256 + screen_guard;
-  *sy_top = (int32_t)-cc_y_top * (screen_height / 2) * 256 / cc_w +
-            screen_height / 2 * 256 + screen_guard;
-  *sy_bot = (int32_t)-cc_y_bot * (screen_height / 2) * 256 / cc_w +
-            screen_height / 2 * 256 + screen_guard;
-  *sz = (int32_t)-65536 / cc_w;
-}
-
-static constexpr int16_t frustum_guard = 1;
-
-static bool in_frustum(int16_t cc_x, int16_t cc_y_top, int16_t cc_y_bot,
-                       int16_t cc_w) {
-  if (cc_w <= 0)
-    return false;
-  // Using a FOV of 90 degrees, the frustum left and right are defined by y =
-  // +-w.
-  if (abs(cc_x) > cc_w + frustum_guard)
-    return false;
-
-  if (abs(cc_y_top) > cc_w + frustum_guard)
-    return false;
-  return abs(cc_y_bot) <= cc_w + frustum_guard;
-}
-
-static bool wall_on_screen(int16_t cc_x1, int16_t cc_y_top1, int16_t cc_y_bot1,
-                           int16_t cc_w1, int16_t cc_x2, int16_t cc_y_top2,
-                           int16_t cc_y_bot2, int16_t cc_w2) {
-  if (cc_x1 < -cc_w1 && cc_x2 < -cc_w2) {
-    DEBUG("Both points to the left of left frustum edge.\n");
-    return false;
-  }
-  if (cc_x1 > cc_w1 && cc_x2 > cc_w2) {
-    DEBUG("Both points to the right of right frustum edge.\n");
-    return false;
-  }
-  if (cc_y_bot1 > cc_w1 && cc_y_bot2 > cc_w2) {
-    DEBUG("Bottom of both walls above top frustum edge.\n");
-    return false;
-  }
-  if (cc_y_top1 < -cc_w1 && cc_y_top2 < -cc_w2) {
-    DEBUG("Top of both walls below bottom frustum edge.\n");
-    return false;
-  }
-  return true;
+  // The horizontal frustum is x = +-w, and we'd like the vertical frustum to
+  // be y = +-w, instead of y = +-ht/wt*w. Accordingly, scale here by wt/ht.
+  *cc_y = Log(player.z - z) * lw_over_h;
 }

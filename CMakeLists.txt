@@ -11,14 +11,16 @@ add_executable(render
 	line.cc
 	main.cc
 	map.cc
+	log.cc
+	logt.c
+	lcos.c
 	mul.c
 	overhead.cc
 	perspective.cc
 	qs.c
 	screen.cc
 	sin.c
-	trig.c
-	wall.cc
+	trig.cc
 )
 
 target_link_libraries(render neslib nesdoug)
