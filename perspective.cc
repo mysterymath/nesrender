@@ -16,14 +16,21 @@
 // #define DEBUG_FILE
 #include "debug.h"
 
+#define DEBUG_CC(PREFIX, NAME)                                                 \
+  DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
+        NAME##_w)
+
+static void clear_col_z();
+static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
-static void clear_col_z();
 
 void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
   clear_col_z();
+
+  setup_camera();
   move_to(400, 400);
   draw_to(400, 600);
   draw_to(600, 600);
@@ -57,9 +64,11 @@ static void clear_col_z() {
   memset(col_z_hi, 0xff, sizeof col_z_hi);
 }
 
-#define DEBUG_CC(PREFIX, NAME)                                                 \
-  DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
-        NAME##_w)
+static Log lcamera_cos, lcamera_sin;
+static void setup_camera() {
+  lcamera_cos = lcos(-player.ang);
+  lcamera_sin = lsin(-player.ang);
+}
 
 // 64/60
 constexpr Log lw_over_h(false, 191);
@@ -416,10 +425,12 @@ static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
     col_z_lo[cur_px] = sz & 0xff;
     col_z_hi[cur_px] = sz >> 8;
     if (cur_px & 1) {
-      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
+      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px],
+                        on_bg);
       fb_col += 30;
     } else {
-      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
+      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px],
+                         on_bg);
     }
   }
 }
@@ -493,10 +504,10 @@ void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
-  int16_t tx = x - player.x;
-  int16_t ty = y - player.y;
-  int16_t vx = mul_cos(-player.ang, tx) - mul_sin(-player.ang, ty);
-  int16_t vy = mul_sin(-player.ang, tx) + mul_cos(-player.ang, ty);
+  Log ltx = x - player.x;
+  Log lty = y - player.y;
+  int16_t vx = lcamera_cos * ltx - lcamera_sin * lty;
+  int16_t vy = lcamera_sin * ltx + lcamera_cos * lty;
   *cc_x = -vy;
   *cc_w = vx;
 }
