@@ -12,6 +12,7 @@ add_executable(render
 	main.cc
 	map.cc
 	log.cc
+	log.s
 	logt.c
 	lcos.c
 	mul.c
