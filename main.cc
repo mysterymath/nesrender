@@ -46,6 +46,8 @@ int main() {
     overhead::begin();
   else
     perspective::begin();
+  ppu_wait_nmi();
+  vram_inc(1);
 
   load_map(*maps[0]);
   uint8_t last_update = get_frame_count();
