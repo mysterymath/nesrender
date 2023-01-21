@@ -13,7 +13,7 @@
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
-//#define DEBUG_FILE
+// #define DEBUG_FILE
 #include "debug.h"
 
 #define DEBUG_CC(PREFIX, NAME)                                                 \
@@ -25,7 +25,7 @@ static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
-void perspective::render() {
+__attribute__((noinline)) void perspective::render() {
   DEBUG("Begin frame.\n");
   clear_screen();
   clear_col_z();
@@ -504,8 +504,8 @@ void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
-  Log ltx = x - player.x;
-  Log lty = y - player.y;
+  Log ltx = x - (player.x >> 8);
+  Log lty = y - (player.y >> 8);
   int16_t vx = lcamera_cos * ltx - lcamera_sin * lty;
   int16_t vy = lcamera_sin * ltx + lcamera_cos * lty;
   *cc_x = -vy;
@@ -515,5 +515,5 @@ static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
 static void z_to_cc(uint16_t z, int16_t *cc_y) {
   // The horizontal frustum is x = +-w, and we'd like the vertical frustum to
   // be y = +-w, instead of y = +-ht/wt*w. Accordingly, scale here by wt/ht.
-  *cc_y = Log(player.z - z) * lw_over_h;
+  *cc_y = Log((player.z >> 8) - z) * lw_over_h;
 }

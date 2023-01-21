@@ -6,9 +6,9 @@
 #include "log.h"
 
 struct Player {
-  uint16_t x = 500;
-  uint16_t y = 500;
-  uint16_t z = 50;
+  uint32_t x = 500l * 256;
+  uint32_t y = 500l * 256;
+  uint32_t z = 50l * 256;
   uint16_t ang = 0;
 
   uint16_t dz = 0;
@@ -20,8 +20,8 @@ struct Player {
   void strafe_left();
   void strafe_right();
 
-  static constexpr Log lspeed = Log(false, 4755);
-  static constexpr uint16_t ang_speed = 1024;
+  static constexpr Log lspeed = Log(false, 17043);
+  static constexpr uint16_t ang_speed = 256;
 };
 
 extern Player player;

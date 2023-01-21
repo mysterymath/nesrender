@@ -43,9 +43,6 @@ __attribute__((constructor)) static void init() {
 }
 
 void present() {
-  if (updating_vram)
-    ppu_wait_nmi();
-
   static uint8_t x;
   static uint8_t *next_col;
   static uint8_t *cur_col;

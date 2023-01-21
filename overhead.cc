@@ -21,7 +21,7 @@ static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
-void overhead::render() {
+__attribute__((noinline)) void overhead::render() {
   clear_screen();
   setup_camera();
   move_to(400, 400);
@@ -106,8 +106,8 @@ static void draw_to(uint16_t x, uint16_t y) {
 }
 
 void w_to_vc(uint16_t x, uint16_t y, int16_t *vc_x, int16_t *vc_y) {
-  Log ltx = x - player.x;
-  Log lty = y - player.y;
+  Log ltx = x - (player.x >> 8);
+  Log lty = y - (player.y >> 8);
   *vc_x = lcamera_cos * ltx - lcamera_sin * lty;
   *vc_y = -lcamera_sin * ltx - lcamera_cos * lty;
 }

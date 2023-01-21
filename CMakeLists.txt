@@ -18,7 +18,6 @@ add_executable(render
 	overhead.cc
 	perspective.cc
 	screen.cc
-	sin.c
 	trig.cc
 )
 
