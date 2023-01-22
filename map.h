@@ -19,6 +19,8 @@ struct Player {
   void turn_right();
   void strafe_left();
   void strafe_right();
+  void fly_up();
+  void fly_down();
 
   static constexpr Log lspeed = Log(false, 17043);
   static constexpr uint16_t ang_speed = 256;

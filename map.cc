@@ -22,3 +22,9 @@ void Player::strafe_right() {
   x -= lcos(ang + PI_OVER_2) * lspeed;
   y -= lsin(ang + PI_OVER_2) * lspeed;
 }
+void Player::fly_up() {
+  z += lspeed;
+}
+void Player::fly_down() {
+  z -= lspeed;
+}

@@ -81,9 +81,9 @@ __attribute__((noinline)) static void update() {
   } else {
     if (pad & PAD_A) {
       if (pad & PAD_UP)
-        player.z += 2;
+        player.fly_up();
       else if (pad & PAD_DOWN)
-        player.z -= 2;
+        player.fly_down();
       if (pad & PAD_LEFT)
         player.strafe_left();
       else if (pad & PAD_RIGHT)
