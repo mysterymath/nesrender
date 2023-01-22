@@ -22,9 +22,27 @@ void Player::strafe_right() {
   x -= lcos(ang + PI_OVER_2) * lspeed;
   y -= lsin(ang + PI_OVER_2) * lspeed;
 }
-void Player::fly_up() {
-  z += lspeed;
+void Player::fly_up() { z += lspeed; }
+void Player::fly_down() { z -= lspeed; }
+
+void load_map(const Map &map) {
+  player.x = (uint32_t)map.player_x << 8;
+  player.y = (uint32_t)map.player_y << 8;
+  player.z = (uint32_t)map.player_z << 8;
+  player.ang = map.player_ang;
 }
-void Player::fly_down() {
-  z -= lspeed;
-}
+
+static Vertex vertices[] = {
+    {400, 400}, {400, 600}, {600, 600}, {500, 500}, {600, 400},
+    {430, 430}, {420, 420}, {430, 410}, {440, 420},
+};
+
+static Wall walls[] = {
+    {&vertices[0], true},  {&vertices[1], false}, {&vertices[2], false},
+    {&vertices[3], false}, {&vertices[4], false}, {&vertices[5], true},
+    {&vertices[6], false}, {&vertices[7], false}, {&vertices[8], false},
+};
+
+static Sector sectors[] = {{20, 80, 9, walls}};
+
+Map test_map = {500, 500, 50, 0, sizeof(sectors) / sizeof(Sector), sectors};

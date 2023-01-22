@@ -2,7 +2,6 @@
 
 #include "draw.h"
 #include "log.h"
-#include "map.h"
 #include "screen.h"
 #include "trig.h"
 #include "util.h"
@@ -21,21 +20,26 @@ static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
-__attribute__((noinline)) void overhead::render() {
+__attribute__((noinline)) void overhead::render(const Map &map) {
   clear_screen();
   setup_camera();
-  move_to(400, 400);
-  draw_to(400, 600);
-  draw_to(600, 600);
-  draw_to(500, 500);
-  draw_to(600, 400);
-  draw_to(400, 400);
-
-  move_to(430, 430);
-  draw_to(420, 420);
-  draw_to(430, 410);
-  draw_to(440, 420);
-  draw_to(430, 430);
+  for (uint16_t i = 0; i < map.num_sectors; i++) {
+    Sector &s = map.sectors[i];
+    Wall *begin_loop = nullptr;
+    for (uint16_t j = 0; j < s.num_walls; j++) {
+      Wall &w = s.walls[j];
+      if (w.begin_loop) {
+        if (begin_loop)
+          draw_to(begin_loop->left->x, begin_loop->left->y);
+        move_to(w.left->x, w.left->y);
+        begin_loop = &w;
+      } else {
+        draw_to(w.left->x, w.left->y);
+      }
+    }
+    if (begin_loop)
+      draw_to(begin_loop->left->x, begin_loop->left->y);
+  }
 }
 
 static Log lcamera_cos, lcamera_sin;

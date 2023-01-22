@@ -3,9 +3,11 @@
 
 #include <stdint.h>
 
+#include "map.h"
+
 namespace overhead {
 
-void render();
+void render(const Map &map);
 void scale_up();
 void scale_down();
 

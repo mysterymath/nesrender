@@ -6,7 +6,6 @@
 
 #include "draw.h"
 #include "log.h"
-#include "map.h"
 #include "screen.h"
 #include "trig.h"
 #include "util.h"
@@ -25,24 +24,34 @@ static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
-__attribute__((noinline)) void perspective::render() {
+static int16_t ceiling_z;
+static int16_t floor_z;
+
+__attribute__((noinline)) void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
   clear_screen();
   clear_col_z();
 
   setup_camera();
-  move_to(400, 400);
-  draw_to(400, 600);
-  draw_to(600, 600);
-  draw_to(500, 500);
-  draw_to(600, 400);
-  draw_to(400, 400);
-
-  move_to(430, 430);
-  draw_to(420, 420);
-  draw_to(430, 410);
-  draw_to(440, 420);
-  draw_to(430, 430);
+  for (uint16_t i = 0; i < map.num_sectors; i++) {
+    Sector &s = map.sectors[i];
+    ceiling_z = s.ceiling_z;
+    floor_z = s.floor_z;
+    Wall *begin_loop = nullptr;
+    for (uint16_t j = 0; j < s.num_walls; j++) {
+      Wall &w = s.walls[j];
+      if (w.begin_loop) {
+        if (begin_loop)
+          draw_to(begin_loop->left->x, begin_loop->left->y);
+        move_to(w.left->x, w.left->y);
+        begin_loop = &w;
+      } else {
+        draw_to(w.left->x, w.left->y);
+      }
+    }
+    if (begin_loop)
+      draw_to(begin_loop->left->x, begin_loop->left->y);
+  }
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
@@ -52,9 +61,6 @@ static int16_t cur_cc_x;
 static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
-
-constexpr int16_t wall_top_z = 80;
-constexpr int16_t wall_bot_z = 20;
 
 static uint8_t col_z_lo[screen_width];
 static uint8_t col_z_hi[screen_width];
@@ -79,8 +85,8 @@ constexpr Log lh_over_2_times_256(false, 26433);
 static void move_to(uint16_t x, uint16_t y) {
   DEBUG("Move to: (%u,%u)\n", x, y);
   xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
-  z_to_cc(wall_top_z, &cur_cc_y_top);
-  z_to_cc(wall_bot_z, &cur_cc_y_bot);
+  z_to_cc(ceiling_z, &cur_cc_y_top);
+  z_to_cc(floor_z, &cur_cc_y_bot);
   DEBUG_CC("Moved to CC:", cur_cc);
 }
 
@@ -117,8 +123,8 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
   xy_to_cc(x, y, &cc_x, &cc_w);
 
   int16_t cc_y_top, cc_y_bot;
-  z_to_cc(wall_top_z, &cc_y_top);
-  z_to_cc(wall_bot_z, &cc_y_bot);
+  z_to_cc(ceiling_z, &cc_y_top);
+  z_to_cc(floor_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
 
   int16_t orig_cc_x = cc_x;

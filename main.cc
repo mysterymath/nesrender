@@ -35,10 +35,10 @@ int main() {
   pal_bg(bg_pal);
   pal_spr(spr_pal);
   bank_spr(1);
+  oam_spr(128 - 4, 120 - 4, 0, 0);
   ppu_on_all();
 
-  oam_spr(128 - 4, 120 - 4, 0, 0);
-
+  load_map(test_map);
   uint8_t last_update = get_frame_count();
   uint8_t last_present = get_frame_count();
   while (true) {
@@ -47,9 +47,9 @@ int main() {
       update();
     if (!still_presenting) {
       if (overhead_view)
-        overhead::render();
+        overhead::render(test_map);
       else
-        perspective::render();
+        perspective::render(test_map);
     }
     idle(last_present);
     present();
