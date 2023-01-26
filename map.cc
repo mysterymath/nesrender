@@ -40,4 +40,5 @@ static Wall walls[] = {
 
 static Sector sectors[] = {{20, 80, 9, walls}};
 
-Map test_map = {500, 500, 50, 0, sizeof(sectors) / sizeof(Sector), sectors};
+Map test_map = {
+    500, 500, 50, 0, &sectors[0], sizeof(sectors) / sizeof(Sector)};

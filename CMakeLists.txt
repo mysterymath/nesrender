@@ -16,6 +16,8 @@ add_executable(render
 	logt.c
 	lcos.c
 	overhead.cc
+	outer_inner.cc
+	square.cc
 	perspective.cc
 	screen.cc
 	trig.cc

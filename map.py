@@ -1,8 +1,11 @@
 from collections import namedtuple
+from pathlib import Path
 import struct
 import sys
 
-with open(sys.argv[1], "rb") as f:
+map_path = Path(sys.argv[1])
+
+with map_path.open("rb") as f:
   b = f.read()
 
 Header = namedtuple('Header', [
@@ -81,7 +84,13 @@ def transform_y(y):
 def transform_z(z):
   return round(-z / 2**6) + 32768 # i.e., / 2^14 * 2^10, but then scale by xy, i.e., / 2^2
 
-print('#include "map.h"')
+def transform_ang(ang):
+  if not ang:
+    return 0
+  return 65536 - ang * 2**5 # / 2^11 * 2^16 * -1
+
+
+print('#include "map.h"\n')
 
 print('static Wall walls[] = {')
 chain_begin = 0
@@ -92,11 +101,21 @@ for i, w in enumerate(walls):
   if w.point2 == chain_begin:
     chain_begin = i+1
   print(f'  {{{x}, {y}, {begins_chain}}},')
-print('};');
+print('};\n');
 
 print('static Sector sectors[] = {')
 for s in sectors:
   floor_z = transform_z(s.floorz)
   ceiling_z = transform_z(s.ceilingz)
   print(f'  {{{floor_z}, {ceiling_z}, {s.wallnum}, &walls[{s.wallptr}]}},')
-print('};');
+print('};\n');
+
+print(f'static Map {map_path.stem}_map = {{')
+player_x = transform_x(header.posx)
+player_y = transform_y(header.posy)
+player_z = transform_z(header.posz)
+player_ang = transform_ang(header.ang)
+print(f'  {player_x}, {player_y}, {player_z}, {player_ang},')
+print(f'  &sectors[{header.cursectnum}],')
+print(f'  {len(sectors)},')
+print('};')

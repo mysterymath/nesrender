@@ -33,25 +33,23 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   clear_col_z();
 
   setup_camera();
-  for (uint16_t i = 0; i < map.num_sectors; i++) {
-    Sector &s = map.sectors[i];
-    ceiling_z = s.ceiling_z;
-    floor_z = s.floor_z;
-    Wall *begin_loop = nullptr;
-    for (uint16_t j = 0; j < s.num_walls; j++) {
-      Wall &w = s.walls[j];
-      if (w.begin_loop) {
-        if (begin_loop)
-          draw_to(begin_loop->x, begin_loop->y);
-        move_to(w.x, w.y);
-        begin_loop = &w;
-      } else {
-        draw_to(w.x, w.y);
-      }
+  Sector &s = *map.player_sector;
+  ceiling_z = s.ceiling_z;
+  floor_z = s.floor_z;
+  Wall *begin_loop = nullptr;
+  for (uint16_t j = 0; j < s.num_walls; j++) {
+    Wall &w = s.walls[j];
+    if (w.begin_loop) {
+      if (begin_loop)
+        draw_to(begin_loop->x, begin_loop->y);
+      move_to(w.x, w.y);
+      begin_loop = &w;
+    } else {
+      draw_to(w.x, w.y);
     }
-    if (begin_loop)
-      draw_to(begin_loop->x, begin_loop->y);
   }
+  if (begin_loop)
+    draw_to(begin_loop->x, begin_loop->y);
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);

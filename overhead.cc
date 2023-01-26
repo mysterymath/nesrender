@@ -23,23 +23,21 @@ static void draw_to(uint16_t x, uint16_t y);
 __attribute__((noinline)) void overhead::render(const Map &map) {
   clear_screen();
   setup_camera();
-  for (uint16_t i = 0; i < map.num_sectors; i++) {
-    Sector &s = map.sectors[i];
-    Wall *begin_loop = nullptr;
-    for (uint16_t j = 0; j < s.num_walls; j++) {
-      Wall &w = s.walls[j];
-      if (w.begin_loop) {
-        if (begin_loop)
-          draw_to(begin_loop->x, begin_loop->y);
-        move_to(w.x, w.y);
-        begin_loop = &w;
-      } else {
-        draw_to(w.x, w.y);
-      }
+  Sector &s = *map.player_sector;
+  Wall *begin_loop = nullptr;
+  for (uint16_t j = 0; j < s.num_walls; j++) {
+    Wall &w = s.walls[j];
+    if (w.begin_loop) {
+      if (begin_loop)
+        draw_to(begin_loop->x, begin_loop->y);
+      move_to(w.x, w.y);
+      begin_loop = &w;
+    } else {
+      draw_to(w.x, w.y);
     }
-    if (begin_loop)
-      draw_to(begin_loop->x, begin_loop->y);
   }
+  if (begin_loop)
+    draw_to(begin_loop->x, begin_loop->y);
 }
 
 static Log lcamera_cos, lcamera_sin;

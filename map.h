@@ -39,8 +39,8 @@ struct Sector {
 
 struct Map {
   uint16_t player_x, player_y, player_z, player_ang;
+  Sector *player_sector;
   uint16_t num_sectors;
-  Sector *sectors;
 };
 
 extern Player player;
