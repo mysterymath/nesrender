@@ -11,7 +11,7 @@ static Sector sectors[] = {
   {32640, 32896, 4, &walls[0]},
 };
 
-static Map square_map = {
+Map square_map = {
   32768, 32768, 32768, 0,
   &sectors[0],
   1,

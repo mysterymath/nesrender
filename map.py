@@ -110,7 +110,7 @@ for s in sectors:
   print(f'  {{{floor_z}, {ceiling_z}, {s.wallnum}, &walls[{s.wallptr}]}},')
 print('};\n');
 
-print(f'static Map {map_path.stem}_map = {{')
+print(f'Map {map_path.stem}_map = {{')
 player_x = transform_x(header.posx)
 player_y = transform_y(header.posy)
 player_z = transform_z(header.posz)

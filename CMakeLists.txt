@@ -16,14 +16,18 @@ add_executable(render
 	logt.c
 	lcos.c
 	overhead.cc
-	outer_inner.cc
-	square.cc
 	perspective.cc
 	screen.cc
 	trig.cc
 )
 
-target_link_libraries(render neslib nesdoug)
+add_library(maps
+	test_map.cc
+	outer_inner_map.cc
+	square_map.cc
+)
+
+target_link_libraries(render neslib nesdoug maps)
 target_include_directories(render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 set_property(SOURCE chr.s PROPERTY

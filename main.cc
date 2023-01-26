@@ -20,7 +20,14 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-bool overhead_view = true;
+extern Map test_map;
+extern Map square_map;
+extern Map outer_inner_map;
+
+static Map *maps[] = {&test_map, &square_map, &outer_inner_map};
+static uint8_t cur_map_idx = 0;
+
+static bool overhead_view = true;
 
 static void update();
 static void idle(uint8_t last_present);
@@ -47,9 +54,9 @@ int main() {
       update();
     if (!still_presenting) {
       if (overhead_view)
-        overhead::render(test_map);
+        overhead::render(*maps[cur_map_idx]);
       else
-        perspective::render(test_map);
+        perspective::render(*maps[cur_map_idx]);
     }
     idle(last_present);
     present();
@@ -72,6 +79,11 @@ __attribute__((noinline)) static void update() {
       oam_spr(128 - 4, 120 - 4, 0, 0);
     else
       oam_clear();
+  }
+  if (pad_t & PAD_SELECT) {
+    if (++cur_map_idx == sizeof(maps) / sizeof(Map *))
+      cur_map_idx = 0;
+    load_map(*maps[cur_map_idx]);
   }
   if (overhead_view && pad & PAD_B) {
     if (pad & PAD_UP)

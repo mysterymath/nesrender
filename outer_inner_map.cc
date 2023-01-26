@@ -15,7 +15,7 @@ static Sector sectors[] = {
   {32640, 32896, 8, &walls[0]},
 };
 
-static Map outer_inner_map = {
+Map outer_inner_map = {
   32768, 32768, 32768, 0,
   &sectors[0],
   1,
