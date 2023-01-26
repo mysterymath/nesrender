@@ -25,7 +25,7 @@ def parse_list(typ, fmt, b):
   total_size = num * size
   return (list(map(typ._make, struct.iter_unpack(fmt, b[:total_size]))), b[total_size:])
 
-(sectors, b) = parse_list(
+sectors, b = parse_list(
   namedtuple('Sector', [
    'wallptr', 'wallnum',
    'ceilingz', 'floorz',
@@ -43,7 +43,7 @@ def parse_list(typ, fmt, b):
   b
 )
 
-(walls, b) = parse_list(
+walls, b = parse_list(
   namedtuple('Wall', [
    'x', 'y',
    'point2', 'nextwall', 'nextsector', 'cstat',
@@ -56,7 +56,7 @@ def parse_list(typ, fmt, b):
   b
 )
 
-(sprites, b) = parse_list(
+sprites, b = parse_list(
   namedtuple('Sprite', [
    'x', 'y', 'z',
    'cstat', 'picnum',
@@ -95,5 +95,12 @@ print('static Vertex vertices[] = {')
 print(','.join([f'{{{v[0]},{v[1]}}}' for v in vertices]))
 print('};');
 
-print(sectors)
-print(walls)
+print('static Wall walls[] = {')
+chain_begin = 0
+for i, w in enumerate(walls):
+  wall_idx = get_vertex(transform_x(w.x), transform_y(w.y))
+  begins_chain = 'true' if i == chain_begin else 'false'
+  if w.point2 == chain_begin:
+    chain_begin = i+1
+  print(f'{{&vertices[{wall_idx}], {begins_chain}}}')
+print('};');
