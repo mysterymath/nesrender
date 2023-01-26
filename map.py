@@ -91,5 +91,12 @@ for i, w in enumerate(walls):
   begins_chain = 'true' if i == chain_begin else 'false'
   if w.point2 == chain_begin:
     chain_begin = i+1
-  print(f'{{{x}, {y}, {begins_chain}}},')
+  print(f'  {{{x}, {y}, {begins_chain}}},')
+print('};');
+
+print('static Sector sectors[] = {')
+for s in sectors:
+  floor_z = transform_z(s.floorz)
+  ceiling_z = transform_z(s.ceilingz)
+  print(f'  {{{floor_z}, {ceiling_z}, {s.wallnum}, &walls[{s.wallptr}]}},')
 print('};');
