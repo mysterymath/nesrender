@@ -32,15 +32,10 @@ void load_map(const Map &map) {
   player.ang = map.player_ang;
 }
 
-static Vertex vertices[] = {
-    {400, 400}, {400, 600}, {600, 600}, {500, 500}, {600, 400},
-    {430, 430}, {420, 420}, {430, 410}, {440, 420},
-};
-
 static Wall walls[] = {
-    {&vertices[0], true},  {&vertices[1], false}, {&vertices[2], false},
-    {&vertices[3], false}, {&vertices[4], false}, {&vertices[5], true},
-    {&vertices[6], false}, {&vertices[7], false}, {&vertices[8], false},
+    {400, 400, true},  {400, 600, false}, {600, 600, false},
+    {500, 500, false}, {600, 400, false}, {430, 430, true},
+    {420, 420, false}, {430, 410, false}, {440, 420, false},
 };
 
 static Sector sectors[] = {{20, 80, 9, walls}};

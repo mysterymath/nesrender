@@ -30,15 +30,15 @@ __attribute__((noinline)) void overhead::render(const Map &map) {
       Wall &w = s.walls[j];
       if (w.begin_loop) {
         if (begin_loop)
-          draw_to(begin_loop->left->x, begin_loop->left->y);
-        move_to(w.left->x, w.left->y);
+          draw_to(begin_loop->x, begin_loop->y);
+        move_to(w.x, w.y);
         begin_loop = &w;
       } else {
-        draw_to(w.left->x, w.left->y);
+        draw_to(w.x, w.y);
       }
     }
     if (begin_loop)
-      draw_to(begin_loop->left->x, begin_loop->left->y);
+      draw_to(begin_loop->x, begin_loop->y);
   }
 }
 

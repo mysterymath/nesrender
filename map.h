@@ -26,12 +26,8 @@ struct Player {
   static constexpr uint16_t ang_speed = 256;
 };
 
-struct Vertex {
-  uint16_t x, y;
-};
-
 struct Wall {
-  Vertex *left;
+  uint16_t x, y; // Left
   bool begin_loop;
 };
 

@@ -81,26 +81,15 @@ def transform_y(y):
 def transform_z(z):
   return round(-z / 2**6) + 32768 # i.e., / 2^14 * 2^10, but then scale by xy, i.e., / 2^2
 
-vertices = {}
-def get_vertex(x, y):
-  if (x,y) not in vertices:
-    vertices[(x,y)] = len(vertices)
-  return vertices[(x,y)]
-
-for w in walls:
-  get_vertex(transform_x(w.x), transform_y(w.y))
-
 print('#include "map.h"')
-print('static Vertex vertices[] = {')
-print(','.join([f'{{{v[0]},{v[1]}}}' for v in vertices]))
-print('};');
 
 print('static Wall walls[] = {')
 chain_begin = 0
 for i, w in enumerate(walls):
-  wall_idx = get_vertex(transform_x(w.x), transform_y(w.y))
+  x = transform_x(w.x)
+  y = transform_y(w.y)
   begins_chain = 'true' if i == chain_begin else 'false'
   if w.point2 == chain_begin:
     chain_begin = i+1
-  print(f'{{&vertices[{wall_idx}], {begins_chain}}}')
+  print(f'{{{x}, {y}, {begins_chain}}},')
 print('};');
