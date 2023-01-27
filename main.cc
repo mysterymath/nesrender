@@ -37,7 +37,7 @@ int main() {
   static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
-  set_prg_bank(0);
+  set_prg_bank(1);
   pal_bright(4);
   pal_bg(bg_pal);
   pal_spr(spr_pal);
@@ -75,6 +75,7 @@ __attribute__((noinline)) static void update() {
 
   if (pad_t & PAD_START) {
     overhead_view = !overhead_view;
+    set_prg_bank(overhead_view);
     if (overhead_view)
       oam_spr(128 - 4, 120 - 4, 0, 0);
     else

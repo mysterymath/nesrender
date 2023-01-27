@@ -6,7 +6,7 @@
 #include "trig.h"
 #include "util.h"
 
-#pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
+#pragma clang section text = ".prg_rom_1.text" rodata = ".prg_rom_1.rodata"
 
 static uint16_t vc_width = 100;
 Log lvc_width = Log(false, 13607);

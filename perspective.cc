@@ -257,9 +257,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
     uint16_t cur_sz = lsz_to_sz(lcur_sz);
     uint16_t sz = lsz_to_sz(lsz);
 
-    DEBUG("cur_sz: %u, sz: %u\n", lcur_sz, lsz);
     int16_t zm = Log(sz - cur_sz) / Log(sx - cur_sx) * Log::pow2(8);
-    DEBUG("zm: %d\n", zm);
 
     draw_wall(s_to_p(cur_sx), cur_sz, zm, s_to_p(sx));
   }
