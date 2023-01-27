@@ -292,67 +292,114 @@ static uint8_t s_to_p(uint16_t s) {
 static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w) {
-  bool cur_above_top = cur_cc_y < -cur_cc_w;
-  bool cur_below_bot = cur_cc_y > cur_cc_w;
-  bool above_top = cc_y < -cc_w;
-  bool below_bot = cc_y > cc_w;
+  const uint8_t CUR_ABOVE_TOP = 1 << 0;
+  const uint8_t CUR_BELOW_BOT = 1 << 1;
+  const uint8_t ABOVE_TOP = 1 << 2;
+  const uint8_t BELOW_BOT = 1 << 3;
+  uint8_t outcode = 0;
+  if (cur_cc_y < -cur_cc_w)
+    outcode |= CUR_ABOVE_TOP;
+  if (cur_cc_y > cur_cc_w)
+    outcode |= CUR_BELOW_BOT;
+  if (cc_y < -cc_w)
+    outcode |= ABOVE_TOP;
+  if (cc_y > cc_w)
+    outcode |= BELOW_BOT;
 
-  if (!cur_above_top && !cur_below_bot && !above_top && !below_bot) {
-    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, cc_x, cc_y, cc_w);
-  } else if (cur_above_top && above_top) {
+  if ((outcode & (CUR_ABOVE_TOP | ABOVE_TOP)) == (CUR_ABOVE_TOP | ABOVE_TOP)) {
     DEBUG("Clipped both sides to top.\n");
-    clip_and_rasterize_edge(edge, cur_cc_x, -cur_cc_w, cur_cc_w, cc_x, -cc_w,
-                            cc_w);
-  } else if (cur_below_bot && below_bot) {
+    cur_cc_y = -cur_cc_w;
+    cc_y = -cc_w;
+    outcode &= ~(CUR_ABOVE_TOP | ABOVE_TOP);
+  } else if ((outcode & (CUR_BELOW_BOT | BELOW_BOT)) ==
+             (CUR_BELOW_BOT | BELOW_BOT)) {
     DEBUG("Clipped both sides to bot.\n");
-    clip_and_rasterize_edge(edge, cur_cc_x, cur_cc_w, cur_cc_w, cc_x, cc_w,
-                            cc_w);
-  } else {
-    int16_t dx = cc_x - cur_cc_x;
-    int16_t dy = cc_y - cur_cc_y;
-    int16_t dw = cc_w - cur_cc_w;
+    cur_cc_y = cur_cc_w;
+    cc_y = cc_w;
+    outcode &= ~(CUR_BELOW_BOT | BELOW_BOT);
+  }
 
-    int16_t isect_cc_x;
-    int16_t isect_cc_y;
-    int16_t isect_cc_w;
-    if (cur_above_top || above_top) {
-      DEBUG("Clipped to top.\n");
-      // r(t) = cur + vt
-      // r(t)_y = -r(t)_w
-      // cur_y + dyt = -cur_w - dw*t;
-      // t*(dy + dw) = -cur_w - cur_y
-      // t = (-cur_w - cur_y) / (dy + dw)
-      Log t = Log(-cur_cc_w - cur_cc_y) / Log(dy + dw);
-      isect_cc_x = cur_cc_x + Log(dx) * t;
-      isect_cc_y = cur_cc_y + Log(dy) * t;
-      isect_cc_w = -isect_cc_y;
+  if (!outcode) {
+    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, cc_x, cc_y, cc_w);
+    return;
+  }
+
+  int16_t dx = cc_x - cur_cc_x;
+  int16_t dy = cc_y - cur_cc_y;
+  int16_t dw = cc_w - cur_cc_w;
+
+  int16_t top_isect_cc_x;
+  int16_t top_isect_cc_y;
+  int16_t top_isect_cc_w;
+  bool isect_top = outcode & (CUR_ABOVE_TOP | ABOVE_TOP);
+  if (isect_top) {
+    DEBUG("Clipped to top.\n");
+    // r(t) = cur + vt
+    // r(t)_y = -r(t)_w
+    // cur_y + dyt = -cur_w - dw*t;
+    // t*(dy + dw) = -cur_w - cur_y
+    // t = (-cur_w - cur_y) / (dy + dw)
+    Log t = Log(-cur_cc_w - cur_cc_y) / Log(dy + dw);
+    top_isect_cc_x = cur_cc_x + Log(dx) * t;
+    top_isect_cc_y = cur_cc_y + Log(dy) * t;
+    top_isect_cc_w = -top_isect_cc_y;
+    DEBUG("top_isect: (%d,%d,%d)\n", top_isect_cc_x, top_isect_cc_y,
+          top_isect_cc_w);
+    if (outcode & CUR_ABOVE_TOP)
+      cur_cc_y = -cur_cc_w;
+    else
+      cc_y = -cc_w;
+  }
+
+  int16_t bot_isect_cc_x;
+  int16_t bot_isect_cc_y;
+  int16_t bot_isect_cc_w;
+  bool isect_bot = outcode & (CUR_BELOW_BOT | BELOW_BOT);
+  if (isect_bot) {
+    DEBUG("Clipped to bot.\n");
+    // r(t) = cur + vt
+    // r(t)_y = r(t)_w
+    // cur_y + dyt = cur_w + dw*t;
+    // t*(dy - dw) = cur_w - cur_y
+    // t = (cur_w - cur_y) / (dy - dw)
+    Log t = Log(cur_cc_w - cur_cc_y) / Log(dy - dw);
+    bot_isect_cc_x = cur_cc_x + Log(dx) * t;
+    bot_isect_cc_y = cur_cc_y + Log(dy) * t;
+    bot_isect_cc_w = bot_isect_cc_y;
+    DEBUG("bot_isect: (%d,%d,%d)\n", bot_isect_cc_x, bot_isect_cc_y,
+          bot_isect_cc_w);
+    if (outcode & CUR_BELOW_BOT)
+      cur_cc_y = cur_cc_w;
+    else
+      cc_y = cc_w;
+  }
+
+  if (isect_top && isect_bot) {
+    if (outcode & CUR_ABOVE_TOP) {
+      rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, top_isect_cc_x,
+                     top_isect_cc_y, top_isect_cc_w);
+      rasterize_edge(edge, top_isect_cc_x, top_isect_cc_y, top_isect_cc_w,
+                     bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w);
+      rasterize_edge(edge, bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w, cc_x,
+                     cc_y, cc_w);
     } else {
-      DEBUG("Clipped to bot.\n");
-      // r(t) = cur + vt
-      // r(t)_y = r(t)_w
-      // cur_y + dyt = cur_w + dw*t;
-      // t*(dy - dw) = cur_w - cur_y
-      // t = (cur_w - cur_y) / (dy - dw)
-      Log t = Log(cur_cc_w - cur_cc_y) / Log(dy - dw);
-      isect_cc_x = cur_cc_x + Log(dx) * t;
-      isect_cc_y = cur_cc_y + Log(dy) * t;
-      isect_cc_w = isect_cc_y;
+      rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, bot_isect_cc_x,
+                     bot_isect_cc_y, bot_isect_cc_w);
+      rasterize_edge(edge, bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w,
+                     top_isect_cc_x, top_isect_cc_y, top_isect_cc_w);
+      rasterize_edge(edge, top_isect_cc_x, top_isect_cc_y, top_isect_cc_w, cc_x,
+                     cc_y, cc_w);
     }
-    DEBUG("isect: (%d,%d,%d)\n", isect_cc_x, isect_cc_y, isect_cc_w);
-    if (cur_above_top || cur_below_bot) {
-      DEBUG("Clipped left side of edge.\n");
-      clip_and_rasterize_edge(edge, cur_cc_x,
-                              cur_above_top ? -cur_cc_w : cur_cc_w, cur_cc_w,
-                              isect_cc_x, isect_cc_y, isect_cc_w);
-      clip_and_rasterize_edge(edge, isect_cc_x, isect_cc_y, isect_cc_w, cc_x,
-                              cc_y, cc_w);
-    } else {
-      DEBUG("Clipped right side of edge.\n");
-      clip_and_rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, isect_cc_x,
-                              isect_cc_y, isect_cc_w);
-      clip_and_rasterize_edge(edge, isect_cc_x, isect_cc_y, isect_cc_w, cc_x,
-                              above_top ? -cc_w : cc_w, cc_w);
-    }
+  } else if (isect_top) {
+    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, top_isect_cc_x,
+                   top_isect_cc_y, top_isect_cc_w);
+    rasterize_edge(edge, top_isect_cc_x, top_isect_cc_y, top_isect_cc_w, cc_x,
+                   cc_y, cc_w);
+  } else {
+    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, bot_isect_cc_x,
+                   bot_isect_cc_y, bot_isect_cc_w);
+    rasterize_edge(edge, bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w, cc_x,
+                   cc_y, cc_w);
   }
 }
 
