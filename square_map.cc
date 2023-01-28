@@ -1,14 +1,14 @@
 #include "map.h"
 
 static Wall walls[] = {
-  {32640, 32896, true},
-  {32896, 32896, false},
-  {32896, 32640, false},
-  {32640, 32640, false},
+  {32640, 32896, true, 1},
+  {32896, 32896, false, 2},
+  {32896, 32640, false, 3},
+  {32640, 32640, false, 0},
 };
 
 static Sector sectors[] = {
-  {32640, 32896, 4, &walls[0]},
+  {32640, 32896, 1, 0, 4, &walls[0]},
 };
 
 Map square_map = {

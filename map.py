@@ -100,14 +100,14 @@ for i, w in enumerate(walls):
   begins_chain = 'true' if i == chain_begin else 'false'
   if w.point2 == chain_begin:
     chain_begin = i+1
-  print(f'  {{{x}, {y}, {begins_chain}}},')
+  print(f'  {{{x}, {y}, {begins_chain}, {w.picnum}}},')
 print('};\n');
 
 print('static Sector sectors[] = {')
 for s in sectors:
   floor_z = transform_z(s.floorz)
   ceiling_z = transform_z(s.ceilingz)
-  print(f'  {{{floor_z}, {ceiling_z}, {s.wallnum}, &walls[{s.wallptr}]}},')
+  print(f'  {{{floor_z}, {ceiling_z}, {s.floorpicnum}, {s.ceilingpicnum}, {s.wallnum}, &walls[{s.wallptr}]}},')
 print('};\n');
 
 print(f'Map {map_path.stem}_map = {{')

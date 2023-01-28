@@ -29,10 +29,12 @@ struct Player {
 struct Wall {
   uint16_t x, y; // Left
   bool begin_loop;
+  uint8_t color;
 };
 
 struct Sector {
   uint16_t floor_z, ceiling_z;
+  uint8_t floor_color, ceiling_color;
   uint8_t num_walls;
   Wall *walls;
 };

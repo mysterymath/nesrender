@@ -6,6 +6,7 @@
 
 #include "draw.h"
 #include "log.h"
+#include "map.h"
 #include "screen.h"
 #include "trig.h"
 #include "util.h"
@@ -21,11 +22,12 @@
 
 static void clear_col_z();
 static void setup_camera();
-static void move_to(uint16_t x, uint16_t y);
-static void draw_to(uint16_t x, uint16_t y);
+static void begin_loop();
+static void draw_wall();
 
-static int16_t ceiling_z;
-static int16_t floor_z;
+static Sector *sector;
+static Wall *wall;
+static Wall *next_wall;
 
 __attribute__((noinline)) void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
@@ -33,23 +35,19 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   clear_col_z();
 
   setup_camera();
-  Sector &s = *map.player_sector;
-  ceiling_z = s.ceiling_z;
-  floor_z = s.floor_z;
-  Wall *begin_loop = nullptr;
-  for (uint16_t j = 0; j < s.num_walls; j++) {
-    Wall &w = s.walls[j];
-    if (w.begin_loop) {
-      if (begin_loop)
-        draw_to(begin_loop->x, begin_loop->y);
-      move_to(w.x, w.y);
-      begin_loop = &w;
-    } else {
-      draw_to(w.x, w.y);
+  sector = map.player_sector;
+  Wall *loop_begin = nullptr;
+  for (uint16_t j = 0; j < sector->num_walls; j++) {
+    wall = &sector->walls[j];
+    if (wall->begin_loop) {
+      loop_begin = wall;
+      begin_loop();
     }
+    next_wall = (j + 1 == sector->num_walls || sector->walls[j + 1].begin_loop)
+                    ? loop_begin
+                    : &sector->walls[j + 1];
+    draw_wall();
   }
-  if (begin_loop)
-    draw_to(begin_loop->x, begin_loop->y);
 }
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w);
@@ -80,19 +78,19 @@ constexpr Log lw_over_h(false, 191);
 // 60/2*256
 constexpr Log lh_over_2_times_256(false, 26433);
 
-static void move_to(uint16_t x, uint16_t y) {
-  DEBUG("Move to: (%u,%u)\n", x, y);
-  xy_to_cc(x, y, &cur_cc_x, &cur_cc_w);
-  z_to_cc(ceiling_z, &cur_cc_y_top);
-  z_to_cc(floor_z, &cur_cc_y_bot);
+static void begin_loop() {
+  DEBUG("Begin loop: (%u,%u)\n", wall->x, wall->y);
+  xy_to_cc(wall->x, wall->y, &cur_cc_x, &cur_cc_w);
+  z_to_cc(sector->ceiling_z, &cur_cc_y_top);
+  z_to_cc(sector->floor_z, &cur_cc_y_bot);
   DEBUG_CC("Moved to CC:", cur_cc);
 }
 
 template <bool is_odd>
-void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
-                 uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg);
+void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg);
 
-static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px);
+static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
+                             uint8_t px);
 
 static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
                                  int16_t cc_y_top, int16_t cc_y_bot,
@@ -114,15 +112,15 @@ static uint8_t s_to_p(uint16_t s);
 static uint8_t py_tops[64];
 static uint8_t py_bots[64];
 
-__attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
-  DEBUG("Draw to: (%u,%u)\n", x, y);
+__attribute__((noinline)) static void draw_wall() {
+  DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
 
   int16_t cc_x, cc_w;
-  xy_to_cc(x, y, &cc_x, &cc_w);
+  xy_to_cc(next_wall->x, next_wall->y, &cc_x, &cc_w);
 
   int16_t cc_y_top, cc_y_bot;
-  z_to_cc(ceiling_z, &cc_y_top);
-  z_to_cc(floor_z, &cc_y_bot);
+  z_to_cc(sector->ceiling_z, &cc_y_top);
+  z_to_cc(sector->floor_z, &cc_y_bot);
   DEBUG_CC("Draw to", cc);
 
   int16_t orig_cc_x = cc_x;
@@ -259,7 +257,7 @@ __attribute__((noinline)) static void draw_to(uint16_t x, uint16_t y) {
 
     int16_t zm = Log(sz - cur_sz) / Log(sx - cur_sx) * Log::pow2(8);
 
-    draw_wall(s_to_p(cur_sx), cur_sz, zm, s_to_p(sx));
+    screen_draw_wall(s_to_p(cur_sx), cur_sz, zm, s_to_p(sx));
   }
 
 done:
@@ -460,7 +458,8 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
   }
 }
 
-static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
+static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
+                             uint8_t px) {
   DEBUG("x: [%d,%d), sz: %u, zm: %d\n", cur_px, px, sz, zm);
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
   for (; cur_px < px; ++cur_px, sz += zm) {
@@ -474,31 +473,28 @@ static void draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm, uint8_t px) {
     col_z_lo[cur_px] = sz & 0xff;
     col_z_hi[cur_px] = sz >> 8;
     if (cur_px & 1) {
-      draw_column<true>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px],
-                        on_bg);
+      draw_column<true>(fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
       fb_col += 30;
     } else {
-      draw_column<false>(0, 3, 1, fb_col, py_tops[cur_px], py_bots[cur_px],
-                         on_bg);
+      draw_column<false>(fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
     }
   }
 }
 
 // Note: y_bot is exclusive.
 template <bool is_odd>
-void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
-                 uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg) {
+void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg) {
   uint8_t i;
-  if (!ceil_color && on_bg) {
+  if (!sector->ceiling_color && on_bg) {
     i = y_top / 2;
   } else {
     for (i = 0; i < y_top / 2; i++) {
       if (is_odd) {
         col[i] &= 0b00001111;
-        col[i] &= ceil_color << 6 | ceil_color << 4;
+        col[i] &= sector->ceiling_color << 6 | sector->ceiling_color << 4;
       } else {
         col[i] &= 0b11110000;
-        col[i] &= ceil_color << 2 | ceil_color;
+        col[i] &= sector->ceiling_color << 2 | sector->ceiling_color;
       }
     }
   }
@@ -507,23 +503,23 @@ void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
   if (y_bot != y_top && y_top & 1) {
     if (is_odd) {
       col[i] &= 0b00001111;
-      col[i] |= wall_color << 6 | ceil_color << 4;
+      col[i] |= wall->color << 6 | sector->ceiling_color << 4;
     } else {
       col[i] &= 0b11110000;
-      col[i] |= wall_color << 2 | ceil_color;
+      col[i] |= wall->color << 2 | sector->ceiling_color;
     }
     i++;
   }
-  if (!wall_color && on_bg) {
+  if (!wall->color && on_bg) {
     i = y_bot / 2;
   } else {
     for (; i < y_bot / 2; i++) {
       if (is_odd) {
         col[i] &= 0b00001111;
-        col[i] |= wall_color << 6 | wall_color << 4;
+        col[i] |= wall->color << 6 | wall->color << 4;
       } else {
         col[i] &= 0b11110000;
-        col[i] |= wall_color << 2 | wall_color;
+        col[i] |= wall->color << 2 | wall->color;
       }
     }
   }
@@ -532,22 +528,22 @@ void draw_column(uint8_t ceil_color, uint8_t wall_color, uint8_t floor_color,
   if (y_bot != y_top && y_bot & 1) {
     if (is_odd) {
       col[i] &= 0b00001111;
-      col[i] |= floor_color << 6 | wall_color << 4;
+      col[i] |= sector->floor_color << 6 | wall->color << 4;
     } else {
       col[i] &= 0b11110000;
-      col[i] |= floor_color << 2 | wall_color;
+      col[i] |= sector->floor_color << 2 | wall->color;
     }
     i++;
   }
-  if (!floor_color && on_bg)
+  if (!sector->floor_color && on_bg)
     return;
   for (; i < screen_height / 2; i++) {
     if (is_odd) {
       col[i] &= 0b00001111;
-      col[i] |= floor_color << 6 | floor_color << 4;
+      col[i] |= sector->floor_color << 6 | sector->floor_color << 4;
     } else {
       col[i] &= 0b11110000;
-      col[i] |= floor_color << 2 | floor_color;
+      col[i] |= sector->floor_color << 2 | sector->floor_color;
     }
   }
 }
