@@ -22,7 +22,7 @@ struct Player {
   void fly_up();
   void fly_down();
 
-  static constexpr Log lspeed = Log(false, 17043);
+  static constexpr Log lspeed = Log(false, 21139);
   static constexpr uint16_t ang_speed = 256;
 };
 
