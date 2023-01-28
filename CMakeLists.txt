@@ -22,7 +22,6 @@ add_executable(render
 )
 
 add_library(maps
-	test_map.cc
 	outer_inner_map.cc
 	square_map.cc
 )

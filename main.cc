@@ -20,11 +20,10 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
-extern Map test_map;
 extern Map square_map;
 extern Map outer_inner_map;
 
-static Map *maps[] = {&test_map, &square_map, &outer_inner_map};
+static Map *maps[] = {&square_map, &outer_inner_map};
 static uint8_t cur_map_idx = 0;
 
 static bool overhead_view = true;
@@ -45,7 +44,7 @@ int main() {
   oam_spr(128 - 4, 120 - 4, 0, 0);
   ppu_on_all();
 
-  load_map(test_map);
+  load_map(*maps[0]);
   uint8_t last_update = get_frame_count();
   uint8_t last_present = get_frame_count();
   while (true) {

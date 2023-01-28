@@ -8,9 +8,9 @@
 
 #pragma clang section text = ".prg_rom_1.text" rodata = ".prg_rom_1.rodata"
 
-static uint16_t vc_width = 100;
-Log lvc_width = Log(false, 13607);
-static uint16_t vc_height = 94;
+static uint16_t vc_width = 800;
+Log lvc_width = Log(false, 19751);
+static uint16_t vc_height = 750;
 constexpr Log lh_over_w(false, 191);
 
 constexpr Log scale_up_factor(false, -311);

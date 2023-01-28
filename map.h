@@ -44,7 +44,6 @@ struct Map {
 };
 
 extern Player player;
-extern Map test_map;
 
 void load_map(const Map &map);
 
