@@ -8,10 +8,13 @@
 #include "log.h"
 #include "map.h"
 #include "screen.h"
+#include "tex.h"
 #include "trig.h"
 #include "util.h"
 
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
+
+extern const Texture brick;
 
 // #define DEBUG_FILE
 #include "debug.h"
@@ -28,6 +31,11 @@ static void draw_wall();
 static Sector *sector;
 static Wall *wall;
 static Wall *next_wall;
+
+static const uint8_t checkerboard_colors[] = {0, 1, 1, 0};
+static const Texture checkerboard = {2, 2, checkerboard_colors};
+
+static const Texture *texture = &brick;
 
 __attribute__((noinline)) void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
@@ -87,19 +95,20 @@ static void begin_loop() {
 }
 
 template <bool is_odd>
-void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg);
+void draw_column(uint8_t *col, const uint8_t *tex_col, uint16_t sy_top,
+                 uint16_t sy_bot);
 
-static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
-                             uint8_t px);
+static void screen_draw_wall(uint16_t cur_sx, uint16_t sz, int16_t zm,
+                             uint16_t sx);
 
 static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
                                  int16_t cc_y_top, int16_t cc_y_bot,
                                  int16_t cc_w);
 
-static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
+static void clip_and_rasterize_edge(uint16_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w);
-static void rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
+static void rasterize_edge(uint16_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
                            int16_t cur_cc_w, int16_t cc_x, int16_t cc_y,
                            int16_t cc_w);
 
@@ -109,8 +118,8 @@ static uint16_t lsz_to_sz(Log lsy);
 
 static uint8_t s_to_p(uint16_t s);
 
-static uint8_t py_tops[64];
-static uint8_t py_bots[64];
+static uint16_t sy_tops[64];
+static uint16_t sy_bots[64];
 
 __attribute__((noinline)) static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
@@ -239,9 +248,9 @@ __attribute__((noinline)) static void draw_wall() {
       }
     }
 
-    clip_and_rasterize_edge(py_tops, cur_cc_x, cur_cc_y_top, cur_cc_w, cc_x,
+    clip_and_rasterize_edge(sy_tops, cur_cc_x, cur_cc_y_top, cur_cc_w, cc_x,
                             cc_y_top, cc_w);
-    clip_and_rasterize_edge(py_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cc_x,
+    clip_and_rasterize_edge(sy_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cc_x,
                             cc_y_bot, cc_w);
 
     Log lcur_sx = Log(cur_cc_x) / Log(cur_cc_w);
@@ -257,7 +266,7 @@ __attribute__((noinline)) static void draw_wall() {
 
     int16_t zm = Log(sz - cur_sz) / Log(sx - cur_sx) * Log::pow2(8);
 
-    screen_draw_wall(s_to_p(cur_sx), cur_sz, zm, s_to_p(sx));
+    screen_draw_wall(cur_sx, cur_sz, zm, sx);
   }
 
 done:
@@ -283,11 +292,15 @@ static uint16_t lsy_to_sy(Log lsy) {
 
 static uint16_t lsz_to_sz(Log lsz) { return (32768 + lsz * Log::pow2(15)) * 2; }
 
+static Log sz_to_lw_recip(uint16_t sz) {
+  return -Log(sz / 2 - 32768) / Log::pow2(15);
+}
+
 static uint8_t s_to_p(uint16_t s) {
   return s % 256 <= 128 ? s / 256 : s / 256 + 1;
 }
 
-static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
+static void clip_and_rasterize_edge(uint16_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w) {
   const uint8_t CUR_ABOVE_TOP = 1 << 0;
@@ -402,7 +415,7 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
 }
 
 __attribute__((noinline)) static void
-rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
+rasterize_edge(uint16_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
                int16_t cur_cc_w, int16_t cc_x, int16_t cc_y, int16_t cc_w) {
   Log lcur_cc_w = cur_cc_w;
   Log lcc_w = cc_w;
@@ -440,10 +453,7 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
   bool off_screen = false;
   uint8_t px = s_to_p(sx);
   for (uint8_t cur_px = s_to_p(cur_sx); cur_px < px; ++cur_px) {
-    uint8_t cur_py = cur_sy / 256;
-    if (cur_sy % 256 > 128)
-      ++cur_py;
-    edge[cur_px] = cur_py;
+    edge[cur_px] = cur_sy;
     if (!off_screen) {
       if (m < 0 && cur_sy < -m) {
         off_screen = true;
@@ -458,11 +468,21 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
   }
 }
 
-static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
-                             uint8_t px) {
-  DEBUG("x: [%d,%d), sz: %u, zm: %d\n", cur_px, px, sz, zm);
+static void screen_draw_wall(uint16_t cur_sx, uint16_t sz, int16_t zm,
+                             uint16_t sx) {
+  uint8_t cur_px = s_to_p(cur_sx);
+  uint8_t px = s_to_p(sx);
+  uint16_t u = 0;
+  uint16_t um =
+      Log(texture->width) * Log::pow2(8) / Log(sx - cur_sx) * Log::pow2(8);
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
+  const uint8_t *tex_col = texture->colors;
   for (; cur_px < px; ++cur_px, sz += zm) {
+    uint8_t old_pu = u >> 8;
+    u += um;
+    if (u >> 8 != old_pu)
+      tex_col += texture->height;
+
     uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
     bool on_bg = col_z == 0xffff;
     if (sz >= col_z) {
@@ -472,71 +492,89 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
     }
     col_z_lo[cur_px] = sz & 0xff;
     col_z_hi[cur_px] = sz >> 8;
+
+    uint16_t sy_top = sy_tops[cur_px];
+    uint16_t sy_bot = sy_bots[cur_px];
+    Log lw_recip = sz_to_lw_recip(sz);
+
     if (cur_px & 1) {
-      draw_column<true>(fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
+      draw_column<true>(fb_col, tex_col, sy_top, sy_bot);
       fb_col += 30;
     } else {
-      draw_column<false>(fb_col, py_tops[cur_px], py_bots[cur_px], on_bg);
+      draw_column<false>(fb_col, tex_col, sy_top, sy_bot);
     }
   }
 }
 
-// Note: y_bot is exclusive.
 template <bool is_odd>
-void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg) {
+void draw_column(uint8_t *col, const uint8_t *tex_col, uint16_t sy_top,
+                 uint16_t sy_bot) {
+  Log lvm = Log(texture->height) * Log::pow2(8) / Log(sy_bot - sy_top);
+  uint16_t vm = lvm * Log::pow2(8);
+  int16_t v = 0;
+  int16_t offset = 128 - sy_top % 256;
+  if (offset < 0)
+    offset += 256;
+  if (offset) {
+    sy_top += offset;
+    Log loffset = Log(offset);
+    v = lvm * loffset;
+  }
+
+  uint8_t y_top = s_to_p(sy_top);
+  uint8_t y_bot = s_to_p(sy_bot);
+
   uint8_t i;
-  if (!sector->ceiling_color && on_bg) {
-    i = y_top / 2;
-  } else {
-    for (i = 0; i < y_top / 2; i++) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] &= sector->ceiling_color << 6 | sector->ceiling_color << 4;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] &= sector->ceiling_color << 2 | sector->ceiling_color;
-      }
+  for (i = 0; i < y_top / 2; i++) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] &= sector->ceiling_color << 6 | sector->ceiling_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] &= sector->ceiling_color << 2 | sector->ceiling_color;
     }
   }
   if (i == screen_height / 2)
     return;
-  if (y_bot != y_top && y_top & 1) {
-    if (is_odd) {
-      col[i] &= 0b00001111;
-      col[i] |= wall->color << 6 | sector->ceiling_color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] |= wall->color << 2 | sector->ceiling_color;
-    }
-    i++;
-  }
-  if (!wall->color && on_bg) {
-    i = y_bot / 2;
-  } else {
-    for (; i < y_bot / 2; i++) {
+  if (y_bot != y_top) {
+    if (y_top & 1) {
+      uint8_t color = tex_col[v >> 8];
       if (is_odd) {
         col[i] &= 0b00001111;
-        col[i] |= wall->color << 6 | wall->color << 4;
+        col[i] |= color << 6 | sector->ceiling_color << 4;
       } else {
         col[i] &= 0b11110000;
-        col[i] |= wall->color << 2 | wall->color;
+        col[i] |= color << 2 | sector->ceiling_color;
+      }
+      i++;
+      v += vm;
+    }
+    for (; i < y_bot / 2; i++, v += vm) {
+      uint8_t color_lo = tex_col[v >> 8];
+      v += vm;
+      uint8_t color_hi = tex_col[v >> 8];
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] |= color_hi << 6 | color_lo << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] |= color_hi << 2 | color_lo;
       }
     }
-  }
-  if (i == screen_height / 2)
-    return;
-  if (y_bot != y_top && y_bot & 1) {
-    if (is_odd) {
-      col[i] &= 0b00001111;
-      col[i] |= sector->floor_color << 6 | wall->color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] |= sector->floor_color << 2 | wall->color;
+    if (i == screen_height / 2)
+      return;
+    if (y_bot & 1) {
+      uint8_t color = tex_col[v >> 8];
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] |= sector->floor_color << 6 | color << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] |= sector->floor_color << 2 | color;
+      }
+      i++;
     }
-    i++;
   }
-  if (!sector->floor_color && on_bg)
-    return;
   for (; i < screen_height / 2; i++) {
     if (is_odd) {
       col[i] &= 0b00001111;

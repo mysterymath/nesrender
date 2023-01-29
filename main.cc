@@ -32,7 +32,7 @@ static void update();
 static void idle(uint8_t last_present);
 
 int main() {
-  static const uint8_t bg_pal[16] = {0x16, 0x06, 0x07, 0x0f};
+  static const uint8_t bg_pal[16] = {0x0f, 0x06, 0x16, 0x26};
   static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
