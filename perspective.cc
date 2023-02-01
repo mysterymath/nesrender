@@ -31,7 +31,6 @@ static Wall *next_wall;
 
 __attribute__((noinline)) void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
-  clear_screen();
   clear_col_z();
 
   setup_camera();
@@ -87,7 +86,7 @@ static void begin_loop() {
 }
 
 template <bool is_odd>
-void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg);
+void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot);
 
 static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
                              uint8_t px);
@@ -464,7 +463,6 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
   for (; cur_px < px; ++cur_px, sz += zm) {
     uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
-    bool on_bg = col_z == 0xffff;
     if (sz >= col_z) {
       if (cur_px & 1)
         fb_col += 30;
@@ -485,58 +483,54 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
 template <bool is_odd>
 void draw_column(uint8_t *col, uint8_t y_top, uint8_t y_bot, bool on_bg) {
   uint8_t i;
-  if (!sector->ceiling_color && on_bg) {
-    i = y_top / 2;
-  } else {
-    for (i = 0; i < y_top / 2; i++) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] &= sector->ceiling_color << 6 | sector->ceiling_color << 4;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] &= sector->ceiling_color << 2 | sector->ceiling_color;
-      }
+  for (i = 0; i < y_top / 2; i++) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] &= sector->ceiling_color << 6 | sector->ceiling_color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] &= sector->ceiling_color << 2 | sector->ceiling_color;
     }
   }
   if (i == screen_height / 2)
     return;
-  if (y_bot != y_top && y_top & 1) {
-    if (is_odd) {
-      col[i] &= 0b00001111;
-      col[i] |= wall->color << 6 | sector->ceiling_color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] |= wall->color << 2 | sector->ceiling_color;
-    }
-    i++;
-  }
-  if (!wall->color && on_bg) {
-    i = y_bot / 2;
-  } else {
-    for (; i < y_bot / 2; i++) {
+  if (y_bot != y_top) {
+    if (y_top & 1) {
       if (is_odd) {
         col[i] &= 0b00001111;
-        col[i] |= wall->color << 6 | wall->color << 4;
+        col[i] |= wall->color << 6 | sector->ceiling_color << 4;
       } else {
         col[i] &= 0b11110000;
-        col[i] |= wall->color << 2 | wall->color;
+        col[i] |= wall->color << 2 | sector->ceiling_color;
+      }
+      i++;
+    }
+    if (!wall->color && on_bg) {
+      i = y_bot / 2;
+    } else {
+      for (; i < y_bot / 2; i++) {
+        if (is_odd) {
+          col[i] &= 0b00001111;
+          col[i] |= wall->color << 6 | wall->color << 4;
+        } else {
+          col[i] &= 0b11110000;
+          col[i] |= wall->color << 2 | wall->color;
+        }
       }
     }
-  }
-  if (i == screen_height / 2)
-    return;
-  if (y_bot != y_top && y_bot & 1) {
-    if (is_odd) {
-      col[i] &= 0b00001111;
-      col[i] |= sector->floor_color << 6 | wall->color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] |= sector->floor_color << 2 | wall->color;
+    if (i == screen_height / 2)
+      return;
+    if (y_bot & 1) {
+      if (is_odd) {
+        col[i] &= 0b00001111;
+        col[i] |= sector->floor_color << 6 | wall->color << 4;
+      } else {
+        col[i] &= 0b11110000;
+        col[i] |= sector->floor_color << 2 | wall->color;
+      }
+      i++;
     }
-    i++;
   }
-  if (!sector->floor_color && on_bg)
-    return;
   for (; i < screen_height / 2; i++) {
     if (is_odd) {
       col[i] &= 0b00001111;
