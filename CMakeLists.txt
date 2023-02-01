@@ -7,7 +7,6 @@ set(CMAKE_EXECUTABLE_SUFFIX .nes)
 
 add_executable(render
 	chr.s
-	brick.cc
 	draw.cc
 	line.cc
 	main.cc
@@ -27,9 +26,7 @@ add_library(maps
 	square_map.cc
 )
 
-add_library(textures brick.cc)
-
-target_link_libraries(render neslib nesdoug maps textures)
+target_link_libraries(render neslib nesdoug maps)
 target_include_directories(render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 set_property(SOURCE chr.s PROPERTY
