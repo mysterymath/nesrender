@@ -22,20 +22,48 @@
 
 static void clear_col_z();
 static void setup_camera();
+static void draw_sector();
 static void begin_loop();
 static void draw_wall();
+static const Sector *first_portal();
 
-static Sector *sector;
-static Wall *wall;
-static Wall *next_wall;
+static const Sector *sector;
+bool sector_is_portal;
+
+static const Wall *wall;
+static const Wall *next_wall;
+
+static const Sector *portals[64];
+
+#define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
 
 __attribute__((noinline)) void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
   clear_col_z();
 
   setup_camera();
+
   sector = map.player_sector;
-  Wall *loop_begin = nullptr;
+  sector_is_portal = false;
+  draw_sector();
+  sector = first_portal();
+  sector_is_portal = true;
+  while (sector) {
+    clear_col_z();
+    draw_sector();
+    sector = first_portal();
+  }
+}
+
+static const Sector *first_portal() {
+  for (uint8_t i = 0; i < ARRAY_LENGTH(portals); i++)
+    if (portals[i])
+      return portals[i];
+  return nullptr;
+}
+
+static void draw_sector() {
+  const Wall *loop_begin = nullptr;
   for (uint16_t j = 0; j < sector->num_walls; j++) {
     wall = &sector->walls[j];
     if (wall->begin_loop) {
@@ -488,22 +516,22 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
   DEBUG("x: [%d,%d), sz: %u, zm: %d\n", cur_px, px, sz, zm);
   uint8_t *fb_col = &fb_next[cur_px / 2 * 30];
   bool is_left_edge = cur_px;
-  for (; cur_px < px; ++cur_px, sz += zm, is_left_edge = false) {
-    uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
-    if (sz >= col_z) {
-      if (cur_px & 1)
-        fb_col += 30;
+  for (; cur_px < px; fb_col = cur_px & 1 ? fb_col + 30 : fb_col, ++cur_px,
+                      sz += zm, is_left_edge = false) {
+    if (sector_is_portal && portals[cur_px] != sector)
       continue;
-    }
+    uint16_t col_z = col_z_hi[cur_px] << 8 | col_z_lo[cur_px];
+    if (sz >= col_z)
+      continue;
     col_z_lo[cur_px] = sz & 0xff;
     col_z_hi[cur_px] = sz >> 8;
 
-    if (cur_px & 1) {
+    portals[cur_px] = wall->portal;
+
+    if (cur_px & 1)
       draw_column<true>(fb_col, is_left_edge ? 0 : wall->color, cur_px);
-      fb_col += 30;
-    } else {
+    else
       draw_column<false>(fb_col, is_left_edge ? 0 : wall->color, cur_px);
-    }
   }
 }
 
