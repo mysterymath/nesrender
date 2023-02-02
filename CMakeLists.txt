@@ -24,6 +24,7 @@ add_executable(render
 add_library(maps
 	outer_inner_map.cc
 	square_map.cc
+	sectors.cc
 )
 
 target_link_libraries(render neslib nesdoug maps)

@@ -92,7 +92,10 @@ def transform_ang(ang):
 
 print('#include "map.h"\n')
 
-print('static Wall walls[] = {')
+print('namespace {')
+print('extern Sector sectors[];')
+
+print('Wall walls[] = {')
 chain_begin = 0
 for i, w in enumerate(walls):
   x = transform_x(w.x)
@@ -100,15 +103,17 @@ for i, w in enumerate(walls):
   begins_chain = 'true' if i == chain_begin else 'false'
   if w.point2 == chain_begin:
     chain_begin = i+1
-  print(f'  {{{x}, {y}, {begins_chain}, {w.picnum}}},')
+  portal = f'&sectors[{w.nextsector}]' if w.nextsector != -1 else 'nullptr'
+  print(f'  {{{x}, {y}, {begins_chain}, {w.picnum}, {portal}}},')
 print('};\n');
 
-print('static Sector sectors[] = {')
+print('Sector sectors[] = {')
 for s in sectors:
   floor_z = transform_z(s.floorz)
   ceiling_z = transform_z(s.ceilingz)
   print(f'  {{{floor_z}, {ceiling_z}, {s.floorpicnum}, {s.ceilingpicnum}, {s.wallnum}, &walls[{s.wallptr}]}},')
-print('};\n');
+print('};');
+print('}')
 
 print(f'Map {map_path.stem}_map = {{')
 player_x = transform_x(header.posx)

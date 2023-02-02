@@ -26,10 +26,13 @@ struct Player {
   static constexpr uint16_t ang_speed = 256;
 };
 
+struct Sector;
+
 struct Wall {
   uint16_t x, y; // Left
   bool begin_loop;
   uint8_t color;
+  Sector *portal;
 };
 
 struct Sector {

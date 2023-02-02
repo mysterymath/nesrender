@@ -20,10 +20,11 @@ asm(".globl __chr_rom_size\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
 
+extern Map sectors_map;
 extern Map square_map;
 extern Map outer_inner_map;
 
-static Map *maps[] = {&square_map, &outer_inner_map};
+static Map *maps[] = {&sectors_map, &square_map, &outer_inner_map};
 static uint8_t cur_map_idx = 0;
 
 static bool overhead_view = true;
