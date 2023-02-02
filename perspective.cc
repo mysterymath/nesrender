@@ -86,8 +86,11 @@ static void begin_loop() {
 }
 
 template <bool is_odd>
-void draw_column(uint8_t *col, uint8_t wall_color, uint8_t y_top,
-                 uint8_t y_bot);
+void draw_column(uint8_t *col, uint8_t wall_color, uint8_t cur_px);
+
+template <bool is_odd>
+void draw_solid_column(uint8_t *col, uint8_t color, uint8_t y_top,
+                       uint8_t y_bot);
 
 static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
                              uint8_t px);
@@ -110,7 +113,10 @@ static uint16_t lsz_to_sz(Log lsy);
 static uint8_t s_to_p(uint16_t s);
 
 static uint8_t py_tops[64];
+static uint8_t py_ceiling_steps[64];
+static uint8_t py_floor_steps[64];
 static uint8_t py_bots[64];
+static bool has_ceiling_step, has_floor_step;
 
 __attribute__((noinline)) static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
@@ -243,6 +249,25 @@ __attribute__((noinline)) static void draw_wall() {
                             cc_y_top, cc_w);
     clip_and_rasterize_edge(py_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cc_x,
                             cc_y_bot, cc_w);
+
+    if (wall->portal) {
+      has_ceiling_step = wall->portal->ceiling_z < sector->ceiling_z;
+      if (has_ceiling_step) {
+        // TODO: Slopes.
+        int16_t ceiling_cc_y;
+        z_to_cc(wall->portal->ceiling_z, &ceiling_cc_y);
+        clip_and_rasterize_edge(py_ceiling_steps, cur_cc_x, ceiling_cc_y,
+                                cur_cc_w, cc_x, ceiling_cc_y, cc_w);
+      }
+      has_floor_step = wall->portal->floor_z > sector->floor_z;
+      if (has_floor_step) {
+        // TODO: Slopes.
+        int16_t floor_cc_y;
+        z_to_cc(wall->portal->floor_z, &floor_cc_y);
+        clip_and_rasterize_edge(py_floor_steps, cur_cc_x, floor_cc_y, cur_cc_w,
+                                cc_x, floor_cc_y, cc_w);
+      }
+    }
 
     Log lcur_sx = Log(cur_cc_x) / Log(cur_cc_w);
     Log lsx = Log(cc_x) / Log(cc_w);
@@ -472,21 +497,33 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
     }
     col_z_lo[cur_px] = sz & 0xff;
     col_z_hi[cur_px] = sz >> 8;
+
     if (cur_px & 1) {
-      draw_column<true>(fb_col, is_left_edge ? 0 : wall->color, py_tops[cur_px],
-                        py_bots[cur_px]);
+      draw_column<true>(fb_col, is_left_edge ? 0 : wall->color, cur_px);
       fb_col += 30;
     } else {
-      draw_column<false>(fb_col, is_left_edge ? 0 : wall->color,
-                         py_tops[cur_px], py_bots[cur_px]);
+      draw_column<false>(fb_col, is_left_edge ? 0 : wall->color, cur_px);
     }
   }
 }
 
 // Note: y_bot is exclusive.
 template <bool is_odd>
-void draw_column(uint8_t *col, uint8_t wall_color, uint8_t y_top,
-                 uint8_t y_bot) {
+void draw_column(uint8_t *col, uint8_t wall_color, uint8_t cur_px) {
+  uint8_t y_top = py_tops[cur_px];
+  uint8_t y_bot = py_bots[cur_px];
+
+  if (wall->portal) {
+    draw_solid_column<is_odd>(col, sector->ceiling_color, 0, y_top);
+    if (has_ceiling_step)
+      draw_solid_column<is_odd>(col, wall_color, y_top,
+                                py_ceiling_steps[cur_px]);
+    if (has_floor_step)
+      draw_solid_column<is_odd>(col, wall_color, py_floor_steps[cur_px], y_bot);
+    draw_solid_column<is_odd>(col, sector->floor_color, y_bot, screen_height);
+    return;
+  }
+
   uint8_t i;
   for (i = 0; i < y_top / 2; i++) {
     if (is_odd) {
@@ -558,6 +595,49 @@ void draw_column(uint8_t *col, uint8_t wall_color, uint8_t y_top,
       col[i] &= 0b11110000;
       col[i] |= sector->floor_color << 2 | sector->floor_color;
     }
+  }
+}
+
+template <bool is_odd>
+void draw_solid_column(uint8_t *col, uint8_t color, uint8_t y_top,
+                       uint8_t y_bot) {
+  if (y_bot == y_top)
+    return;
+  uint8_t i = y_top / 2;
+  if (y_top & 1) {
+    if (is_odd)
+      col[i] &= 0b00111111;
+    else
+      col[i] &= 0b11110011;
+    i++;
+  } else {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= color << 6;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= color << 2;
+    }
+    i++;
+  }
+  for (; i < y_bot / 2; i++) {
+    if (is_odd) {
+      col[i] &= 0b00001111;
+      col[i] |= color << 6 | color << 4;
+    } else {
+      col[i] &= 0b11110000;
+      col[i] |= color << 2 | color;
+    }
+  }
+  if (y_bot & 1) {
+    if (is_odd) {
+      col[i] &= 0b11001111;
+      col[i] |= color << 4;
+    } else {
+      col[i] &= 0b11111100;
+      col[i] |= color;
+    }
+    i++;
   }
 }
 
