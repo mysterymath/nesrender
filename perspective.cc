@@ -26,6 +26,8 @@ static void draw_sector();
 static void begin_loop();
 static void draw_wall();
 static const Sector *first_portal();
+static void clear_coverage();
+static void update_coverage();
 
 static const Sector *sector;
 bool sector_is_portal;
@@ -40,6 +42,7 @@ static const Sector *portals[64];
 __attribute__((noinline)) void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
   clear_col_z();
+  clear_coverage();
 
   setup_camera();
 
@@ -50,6 +53,7 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   sector_is_portal = true;
   while (sector) {
     clear_col_z();
+    update_coverage();
     draw_sector();
     sector = first_portal();
   }
@@ -60,6 +64,29 @@ static const Sector *first_portal() {
     if (portals[i])
       return portals[i];
   return nullptr;
+}
+
+static uint8_t py_tops[64];
+static uint8_t py_ceiling_steps[64];
+static uint8_t py_floor_steps[64];
+static uint8_t py_bots[64];
+static bool has_ceiling_step, has_floor_step;
+
+static uint8_t coverage_py_tops[64];
+static uint8_t coverage_py_bots[64];
+
+static void clear_coverage() {
+  memset(coverage_py_tops, 0, sizeof(coverage_py_tops));
+  memset(coverage_py_bots, screen_height, sizeof(coverage_py_bots));
+}
+
+static void update_coverage() {
+  for (uint8_t i = 0; i < ARRAY_LENGTH(coverage_py_tops); i++) {
+    if (!portals[i])
+      continue;
+    coverage_py_tops[i] = has_ceiling_step ? py_ceiling_steps[i] : py_tops[i];
+    coverage_py_bots[i] = has_floor_step ? py_floor_steps[i] : py_bots[i];
+  }
 }
 
 static void draw_sector() {
@@ -139,12 +166,6 @@ static uint16_t lsy_to_sy(Log lsy);
 static uint16_t lsz_to_sz(Log lsy);
 
 static uint8_t s_to_p(uint16_t s);
-
-static uint8_t py_tops[64];
-static uint8_t py_ceiling_steps[64];
-static uint8_t py_floor_steps[64];
-static uint8_t py_bots[64];
-static bool has_ceiling_step, has_floor_step;
 
 __attribute__((noinline)) static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
@@ -496,6 +517,10 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
     uint8_t cur_py = cur_sy / 256;
     if (cur_sy % 256 > 128)
       ++cur_py;
+    if (cur_py < coverage_py_tops[cur_px])
+      cur_py = coverage_py_tops[cur_px];
+    if (cur_py > coverage_py_bots[cur_px])
+      cur_py = coverage_py_bots[cur_px];
     edge[cur_px] = cur_py;
     if (!off_screen) {
       if (m < 0 && cur_sy < -m) {
@@ -535,95 +560,29 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
   }
 }
 
-// Note: y_bot is exclusive.
 template <bool is_odd>
 void draw_column(uint8_t *col, uint8_t wall_color, uint8_t cur_px) {
   uint8_t y_top = py_tops[cur_px];
   uint8_t y_bot = py_bots[cur_px];
 
   if (wall->portal) {
-    draw_solid_column<is_odd>(col, sector->ceiling_color, 0, y_top);
+    draw_solid_column<is_odd>(col, sector->ceiling_color,
+                              coverage_py_tops[cur_px], y_top);
     if (has_ceiling_step)
       draw_solid_column<is_odd>(col, wall_color, y_top,
                                 py_ceiling_steps[cur_px]);
     if (has_floor_step)
       draw_solid_column<is_odd>(col, wall_color, py_floor_steps[cur_px], y_bot);
-    draw_solid_column<is_odd>(col, sector->floor_color, y_bot, screen_height);
+    draw_solid_column<is_odd>(col, sector->floor_color, y_bot,
+                              coverage_py_bots[cur_px]);
     return;
   }
 
-  uint8_t i;
-  for (i = 0; i < y_top / 2; i++) {
-    if (is_odd) {
-      col[i] &= 0b00001111;
-      col[i] &= sector->ceiling_color << 6 | sector->ceiling_color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] &= sector->ceiling_color << 2 | sector->ceiling_color;
-    }
-  }
-  if (i == screen_height / 2)
-    return;
-  if (y_bot != y_top) {
-    if (y_top & 1) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] |= sector->ceiling_color << 4;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] |= sector->ceiling_color;
-      }
-      i++;
-    } else if (y_top != 0) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] |= wall_color << 6;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] |= wall_color << 2;
-      }
-      i++;
-    }
-    for (; i < y_bot / 2; i++) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] |= wall_color << 6 | wall_color << 4;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] |= wall_color << 2 | wall_color;
-      }
-    }
-    if (i == screen_height / 2)
-      return;
-    if (y_bot & 1) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] |= wall_color << 4;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] |= wall_color;
-      }
-      i++;
-    } else if (y_bot != screen_height) {
-      if (is_odd) {
-        col[i] &= 0b00001111;
-        col[i] |= sector->floor_color << 6;
-      } else {
-        col[i] &= 0b11110000;
-        col[i] |= sector->floor_color << 2;
-      }
-      i++;
-    }
-  }
-  for (; i < screen_height / 2; i++) {
-    if (is_odd) {
-      col[i] &= 0b00001111;
-      col[i] |= sector->floor_color << 6 | sector->floor_color << 4;
-    } else {
-      col[i] &= 0b11110000;
-      col[i] |= sector->floor_color << 2 | sector->floor_color;
-    }
-  }
+  draw_solid_column<is_odd>(col, sector->ceiling_color,
+                            coverage_py_tops[cur_px], y_top);
+  draw_solid_column<is_odd>(col, wall_color, y_top, y_bot);
+  draw_solid_column<is_odd>(col, sector->floor_color, y_bot,
+                            coverage_py_bots[cur_px]);
 }
 
 template <bool is_odd>
