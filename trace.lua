@@ -3,7 +3,7 @@ io.output(file)
 
 function callback(address, value)
   prg = emu.getPrgRomOffset(address)
-  if prg == -1 then goto continue end 
+  if prg == -1 then goto continue end
   bank = prg // 0x4000
   vma = address
   if address < 0xc000 then
