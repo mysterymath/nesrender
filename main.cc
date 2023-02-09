@@ -27,7 +27,7 @@ extern Map outer_inner_map;
 static Map *maps[] = {&sectors_map, &square_map, &outer_inner_map};
 static uint8_t cur_map_idx = 0;
 
-static bool overhead_view = true;
+static bool overhead_view = false;
 
 static void update();
 static void idle(uint8_t last_present);
@@ -37,12 +37,13 @@ int main() {
   static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
-  set_prg_bank(1);
+  set_prg_bank(overhead_view);
   pal_bright(4);
   pal_bg(bg_pal);
   pal_spr(spr_pal);
   bank_spr(1);
-  oam_spr(128 - 4, 120 - 4, 0, 0);
+  if (overhead_view)
+    oam_spr(128 - 4, 120 - 4, 0, 0);
   ppu_on_all();
 
   load_map(*maps[0]);
