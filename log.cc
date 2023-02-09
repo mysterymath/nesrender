@@ -6,7 +6,7 @@ extern const uint8_t logt_hi[];
 extern const uint8_t alogt_lo[];
 extern const uint8_t alogt_hi[];
 extern uint16_t lin_to_log(int16_t val);
-//extern uint16_t log_to_lin(uint16_t val);
+extern uint16_t log_to_lin(int16_t exp, bool sign);
 }
 
 Log::Log(int16_t val) : sign(val < 0) {
@@ -41,6 +41,7 @@ Log::Log(int16_t val) : sign(val < 0) {
 }
 
 Log::operator int16_t() const {
+#if 0
   // 2^(-1) = 1/2, which, rounding to even, should round to zero. All negative
   // numbers above that should round to 1.
   if (exp <= -1 * 2048)
@@ -52,7 +53,6 @@ Log::operator int16_t() const {
   if (exp >= 15 * 2048)
     return sign ? -32768 : 32767;
 
-#if 1
   // Shift the exponent so the whole/frac boundary is along the byte.
   uint16_t split = exp;
   split >>= 3;
@@ -72,7 +72,7 @@ Log::operator int16_t() const {
 
   return sign ? -uresult : uresult;
 #else
-  return sign ? -log_to_lin(exp) : log_to_lin(exp);
+  return log_to_lin(exp, sign);
 #endif
 }
 
