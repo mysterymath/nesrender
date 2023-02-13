@@ -143,10 +143,6 @@ static void begin_loop() {
 template <bool is_odd>
 void draw_column(uint8_t *col, uint8_t wall_color, uint8_t cur_px);
 
-template <bool is_odd>
-void draw_solid_column(uint8_t *col, uint8_t color, uint8_t y_top,
-                       uint8_t y_bot);
-
 static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
                              uint8_t px);
 
@@ -562,29 +558,31 @@ static void screen_draw_wall(uint8_t cur_px, uint16_t sz, int16_t zm,
 
 template <bool is_odd>
 void draw_column(uint8_t *col, uint8_t wall_color, uint8_t cur_px) {
+  auto draw_solid_column =
+      is_odd ? draw_solid_column_odd : draw_solid_column_even;
+
   uint8_t y_top = py_tops[cur_px];
   uint8_t y_bot = py_bots[cur_px];
 
   if (wall->portal) {
-    draw_solid_column<is_odd>(col, sector->ceiling_color,
-                              coverage_py_tops[cur_px], y_top);
+    draw_solid_column(col, sector->ceiling_color, coverage_py_tops[cur_px],
+                      y_top);
     if (has_ceiling_step)
-      draw_solid_column<is_odd>(col, wall_color, y_top,
-                                py_ceiling_steps[cur_px]);
+      draw_solid_column(col, wall_color, y_top, py_ceiling_steps[cur_px]);
     if (has_floor_step)
-      draw_solid_column<is_odd>(col, wall_color, py_floor_steps[cur_px], y_bot);
-    draw_solid_column<is_odd>(col, sector->floor_color, y_bot,
-                              coverage_py_bots[cur_px]);
+      draw_solid_column(col, wall_color, py_floor_steps[cur_px], y_bot);
+    draw_solid_column(col, sector->floor_color, y_bot,
+                      coverage_py_bots[cur_px]);
     return;
   }
 
-  draw_solid_column<is_odd>(col, sector->ceiling_color,
-                            coverage_py_tops[cur_px], y_top);
-  draw_solid_column<is_odd>(col, wall_color, y_top, y_bot);
-  draw_solid_column<is_odd>(col, sector->floor_color, y_bot,
-                            coverage_py_bots[cur_px]);
+  draw_solid_column(col, sector->ceiling_color, coverage_py_tops[cur_px],
+                    y_top);
+  draw_solid_column(col, wall_color, y_top, y_bot);
+  draw_solid_column(col, sector->floor_color, y_bot, coverage_py_bots[cur_px]);
 }
 
+#if 0
 template <bool is_odd>
 void draw_solid_column(uint8_t *col, uint8_t color, uint8_t y_top,
                        uint8_t y_bot) {
@@ -627,6 +625,7 @@ void draw_solid_column(uint8_t *col, uint8_t color, uint8_t y_top,
     i++;
   }
 }
+#endif
 
 static void xy_to_cc(uint16_t x, uint16_t y, int16_t *cc_x, int16_t *cc_w) {
   Log ltx = x - (player.x >> 8);
