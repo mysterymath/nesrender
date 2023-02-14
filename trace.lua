@@ -1,10 +1,13 @@
 file = io.open("trace", "w")
 io.output(file)
 
-
 vma = 0
 prevCycleCount = 0
 function callback(address, value)
+  if math.random() > 0.01 then
+    vma = 0
+    goto continue
+  end
   cycleCount = emu.getState().cpu.cycleCount
   prg = emu.getPrgRomOffset(address)
   if vma ~= 0 then
