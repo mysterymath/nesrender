@@ -6,6 +6,11 @@ import sys
 locations = set()
 
 profile = profile_pb2.Profile()
+profile.string_table.extend(["", "cpu", "cycles"])
+st = profile.sample_type.add()
+st.type = 1
+st.unit = 2
+
 with open(sys.argv[1]) as file:
     for line in file:
         [addr, count] = line.strip().split()
@@ -20,5 +25,5 @@ for l in locations:
     loc = profile.location.add()
     loc.id = loc.address = l
 
-with open('trace.profile', 'wb') as file:
+with open("trace.pb", "wb") as file:
     file.write(profile.SerializeToString())

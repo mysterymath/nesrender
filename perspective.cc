@@ -179,27 +179,36 @@ __attribute__((noinline)) static void draw_wall() {
   int16_t orig_cc_y_bot = cc_y_bot;
   int16_t orig_cc_w = cc_w;
 
-  bool cur_left_of_left = cur_cc_x < -cur_cc_w;
-  bool cur_right_of_right = cur_cc_x > cur_cc_w;
-  bool left_of_left = cc_x < -cc_w;
-  bool right_of_right = cc_x > cc_w;
+  const uint8_t LEFT = 1 << 0;
+  const uint8_t RIGHT = 1 << 1;
+  const uint8_t BEHIND = 1 << 2;
 
-  // There is homogeneous weirdness when both w are zero. Disallow.
-  if (cc_w <= 0 && cur_cc_w <= 0)
+  uint8_t cur_outcode = 0;
+  if (cur_cc_x < -cur_cc_w)
+    cur_outcode |= LEFT;
+  if (cur_cc_x > cur_cc_w)
+    cur_outcode |= RIGHT;
+  if (cur_cc_w < 1)
+    cur_outcode |= BEHIND;
+
+  uint8_t outcode = 0;
+  if (cc_x < -cc_w)
+    outcode |= LEFT;
+  if (cc_x > cc_w)
+    outcode |= RIGHT;
+  if (cc_w <= 0)
+    outcode |= BEHIND;
+
+  // Frustum cull.
+  if (cur_outcode & outcode) {
+    DEBUG("Round 1 frustum cull: %d %d\n", cur_outcode, outcode);
     goto done;
+  }
 
   {
-    if (cur_left_of_left && left_of_left ||
-        cur_right_of_right && right_of_right) {
-      DEBUG("LR frustum cull round 1: %d %d\n",
-            cur_left_of_left && left_of_left,
-            cur_right_of_right && right_of_right);
-      goto done;
-    }
-
     // Negative w can cause naive frustum culling not to work due to a litany of
     // corner cases, so clip to w=1 (no division by zero please) and cull again.
-    if (cur_cc_w < 1 || cc_w < 1) {
+    if ((cur_outcode | outcode) & BEHIND) {
       int16_t dx = cc_x - cur_cc_x;
       int16_t dy_top = cc_y_top - cur_cc_y_top;
       int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
@@ -216,8 +225,11 @@ __attribute__((noinline)) static void draw_wall() {
         cur_cc_y_top += ldy_top * t;
         cur_cc_y_bot += ldy_bot * t;
         cur_cc_w = 1;
-        cur_left_of_left = cur_cc_x < -cur_cc_w;
-        cur_right_of_right = cur_cc_x > cur_cc_w;
+        cur_outcode = 0;
+        if (cur_cc_x < -cur_cc_w)
+          cur_outcode |= LEFT;
+        if (cur_cc_x > cur_cc_w)
+          cur_outcode |= RIGHT;
         DEBUG("Clipped cur to w=1.\n");
         DEBUG_CC("Cur", cur_cc);
       } else {
@@ -226,17 +238,17 @@ __attribute__((noinline)) static void draw_wall() {
         cc_y_top += ldy_top * t;
         cc_y_bot += ldy_bot * t;
         cc_w = 1;
-        left_of_left = cc_x < -cc_w;
-        right_of_right = cc_x > cc_w;
+        outcode = 0;
+        if (cc_x < -cc_w)
+          outcode |= LEFT;
+        if (cc_x > cc_w)
+          outcode |= RIGHT;
         DEBUG("Clipped next to w=1.\n");
         DEBUG_CC("Next", cc);
       }
 
-      if (cur_left_of_left && left_of_left ||
-          cur_right_of_right && right_of_right) {
-        DEBUG("LR frustum cull round 2: %d %d\n",
-              cur_left_of_left && left_of_left,
-              cur_right_of_right && right_of_right);
+      if (cur_outcode & outcode) {
+        DEBUG("Round 2 frustum cull: %d %d\n", cur_outcode, outcode);
         goto done;
       }
     }
@@ -249,7 +261,7 @@ __attribute__((noinline)) static void draw_wall() {
     // Note that the logarithmic sx values range from [-1, 1], while the
     // unsigned values range from [0, screen_width*256].
 
-    if (cur_left_of_left || right_of_right) {
+    if (cur_outcode & LEFT | outcode & RIGHT) {
       int16_t dx = cc_x - cur_cc_x;
       int16_t dy_top = cc_y_top - cur_cc_y_top;
       int16_t dy_bot = cc_y_bot - cur_cc_y_bot;
@@ -259,7 +271,7 @@ __attribute__((noinline)) static void draw_wall() {
       Log ldy_bot = dy_bot;
       Log ldw = dw;
 
-      if (cur_left_of_left) {
+      if (cur_outcode & LEFT) {
         DEBUG("Wall crosses left frustum edge. Clipping.\n");
         DEBUG_CC("Cur", cur_cc);
         DEBUG_CC("Next", cc);
@@ -277,7 +289,7 @@ __attribute__((noinline)) static void draw_wall() {
         cur_cc_w = -cur_cc_x;
         DEBUG_CC("Clipped Cur", cur_cc);
       }
-      if (right_of_right) {
+      if (outcode & RIGHT) {
         DEBUG("Wall crosses right frustum edge. Clipping.\n");
         DEBUG_CC("Cur", cur_cc);
         DEBUG_CC("Next", cc);
