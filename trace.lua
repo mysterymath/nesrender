@@ -4,7 +4,7 @@ io.output(file)
 vma = 0
 prevCycleCount = 0
 function callback(address, value)
-  if math.random() > 0.01 then
+  if math.random() > 0.1 then
     vma = 0
     goto continue
   end
