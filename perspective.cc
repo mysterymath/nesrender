@@ -20,13 +20,13 @@
   DEBUG("%s: (%d,[%d,%d],%d)\n", PREFIX, NAME##_x, NAME##_y_top, NAME##_y_bot, \
         NAME##_w)
 
-static void clear_col_z();
+extern "C" void clear_col_z();
 static void setup_camera();
 static void draw_sector();
 static void begin_loop();
 static void draw_wall();
 static const Sector *first_portal();
-static void clear_coverage();
+extern "C" void clear_coverage();
 static void update_coverage();
 
 static const Sector *sector;
@@ -72,13 +72,8 @@ static uint8_t py_floor_steps[64];
 static uint8_t py_bots[64];
 static bool has_ceiling_step, has_floor_step;
 
-static uint8_t coverage_py_tops[64];
-static uint8_t coverage_py_bots[64];
-
-static void clear_coverage() {
-  memset(coverage_py_tops, 0, sizeof(coverage_py_tops));
-  memset(coverage_py_bots, screen_height, sizeof(coverage_py_bots));
-}
+uint8_t coverage_py_tops[64];
+uint8_t coverage_py_bots[64];
 
 static void update_coverage() {
   for (uint8_t i = 0; i < ARRAY_LENGTH(coverage_py_tops); i++) {
@@ -112,13 +107,8 @@ static int16_t cur_cc_y_top;
 static int16_t cur_cc_y_bot;
 static int16_t cur_cc_w;
 
-static uint8_t col_z_lo[screen_width];
-static uint8_t col_z_hi[screen_width];
-
-static void clear_col_z() {
-  memset(col_z_lo, 0xff, sizeof col_z_lo);
-  memset(col_z_hi, 0xff, sizeof col_z_hi);
-}
+uint8_t col_z_lo[screen_width];
+uint8_t col_z_hi[screen_width];
 
 static Log lcamera_cos, lcamera_sin;
 static void setup_camera() {

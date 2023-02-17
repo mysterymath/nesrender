@@ -18,6 +18,7 @@ add_executable(render
 	lcos.c
 	overhead.cc
 	perspective.cc
+	perspective.s
 	screen.cc
 	trig.cc
 )
