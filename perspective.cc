@@ -519,28 +519,37 @@ rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
     DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
   }
 
-  bool off_screen = false;
+  int16_t icur_sy = cur_sy;
   uint8_t px = s_to_p(sx);
-  for (uint8_t cur_px = s_to_p(cur_sx); cur_px < px; ++cur_px) {
-    uint8_t cur_py = cur_sy / 256;
-    if (cur_sy % 256 > 128)
+  uint8_t cur_px;
+  bool off_top;
+  for (cur_px = s_to_p(cur_sx); cur_px < px; ++cur_px) {
+    if (icur_sy < 0) {
+      off_top = true;
+      break;
+    }
+    if (icur_sy > screen_height * 256) {
+      off_top = false;
+      break;
+    }
+    uint8_t cur_py = icur_sy >> 8;
+    if ((cur_sy & 0xff) > 128)
       ++cur_py;
     if (cur_py < coverage_py_tops[cur_px])
       cur_py = coverage_py_tops[cur_px];
     if (cur_py > coverage_py_bots[cur_px])
       cur_py = coverage_py_bots[cur_px];
     edge[cur_px] = cur_py;
-    if (!off_screen) {
-      if (m < 0 && cur_sy < -m) {
-        off_screen = true;
-        cur_sy = 0;
-      } else if (m > 0 && cur_sy > (int16_t)(screen_height * 256) - m) {
-        off_screen = true;
-        cur_sy = screen_height * 256;
-      } else {
-        cur_sy += m;
-      }
-    }
+    icur_sy += m;
+  }
+  if (cur_px != px) {
+    uint8_t cur_py = off_top ? 0 : screen_height;
+    if (cur_py < coverage_py_tops[cur_px])
+      cur_py = coverage_py_tops[cur_px];
+    if (cur_py > coverage_py_bots[cur_px])
+      cur_py = coverage_py_bots[cur_px];
+    for (; cur_px < px; ++cur_px)
+      edge[cur_px] = cur_py;
   }
 }
 
