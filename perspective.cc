@@ -143,9 +143,8 @@ static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
 static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w);
-static void rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
-                           int16_t cur_cc_w, int16_t cc_x, int16_t cc_y,
-                           int16_t cc_w);
+static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
+                           uint16_t sx, uint16_t sy);
 
 static uint16_t lsx_to_sx(Log lsx);
 static uint16_t lsy_to_sy(Log lsy);
@@ -389,8 +388,15 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
     outcode &= ~(CUR_BELOW_BOT | BELOW_BOT);
   }
 
+  Log lcur_cc_w = cur_cc_w;
+  uint16_t cur_sx = lsx_to_sx(Log(cur_cc_x) / lcur_cc_w);
+  uint16_t cur_sy = lsy_to_sy(Log(cur_cc_y) / lcur_cc_w);
+  Log lcc_w = cc_w;
+  uint16_t sx = lsx_to_sx(Log(cc_x) / lcc_w);
+  uint16_t sy = lsy_to_sy(Log(cc_y) / lcc_w);
+
   if (!outcode) {
-    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, cc_x, cc_y, cc_w);
+    rasterize_edge(edge, cur_sx, cur_sy, sx, sy);
     return;
   }
 
@@ -401,6 +407,7 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
   int16_t top_isect_cc_x;
   int16_t top_isect_cc_y;
   int16_t top_isect_cc_w;
+  uint16_t top_isect_sx;
   bool isect_top = outcode & (CUR_ABOVE_TOP | ABOVE_TOP);
   if (isect_top) {
     DEBUG("Clipped to top.\n");
@@ -413,17 +420,22 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
     top_isect_cc_x = cur_cc_x + Log(dx) * t;
     top_isect_cc_y = cur_cc_y + Log(dy) * t;
     top_isect_cc_w = -top_isect_cc_y;
+    top_isect_sx = lsx_to_sx(Log(top_isect_cc_x) / Log(top_isect_cc_w));
     DEBUG("top_isect: (%d,%d,%d)\n", top_isect_cc_x, top_isect_cc_y,
           top_isect_cc_w);
-    if (outcode & CUR_ABOVE_TOP)
+    if (outcode & CUR_ABOVE_TOP) {
       cur_cc_y = -cur_cc_w;
-    else
+      cur_sy = 0;
+    } else {
       cc_y = -cc_w;
+      sy = 0;
+    }
   }
 
   int16_t bot_isect_cc_x;
   int16_t bot_isect_cc_y;
   int16_t bot_isect_cc_w;
+  uint16_t bot_isect_sx;
   bool isect_bot = outcode & (CUR_BELOW_BOT | BELOW_BOT);
   if (isect_bot) {
     DEBUG("Clipped to bot.\n");
@@ -436,59 +448,41 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
     bot_isect_cc_x = cur_cc_x + Log(dx) * t;
     bot_isect_cc_y = cur_cc_y + Log(dy) * t;
     bot_isect_cc_w = bot_isect_cc_y;
+    bot_isect_sx = lsx_to_sx(Log(bot_isect_cc_x) / Log(bot_isect_cc_w));
     DEBUG("bot_isect: (%d,%d,%d)\n", bot_isect_cc_x, bot_isect_cc_y,
           bot_isect_cc_w);
-    if (outcode & CUR_BELOW_BOT)
+    if (outcode & CUR_BELOW_BOT) {
       cur_cc_y = cur_cc_w;
-    else
+      cur_sy = screen_height * 256;
+    } else {
       cc_y = cc_w;
+      sy = screen_height * 256;
+    }
   }
 
   if (isect_top && isect_bot) {
     if (outcode & CUR_ABOVE_TOP) {
-      rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, top_isect_cc_x,
-                     top_isect_cc_y, top_isect_cc_w);
-      rasterize_edge(edge, top_isect_cc_x, top_isect_cc_y, top_isect_cc_w,
-                     bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w);
-      rasterize_edge(edge, bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w, cc_x,
-                     cc_y, cc_w);
+      rasterize_edge(edge, cur_sx, 0, top_isect_sx, 0);
+      rasterize_edge(edge, top_isect_sx, 0, bot_isect_sx, screen_height * 256);
+      rasterize_edge(edge, bot_isect_sx, screen_height * 256, sx,
+                     screen_height * 256);
     } else {
-      rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, bot_isect_cc_x,
-                     bot_isect_cc_y, bot_isect_cc_w);
-      rasterize_edge(edge, bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w,
-                     top_isect_cc_x, top_isect_cc_y, top_isect_cc_w);
-      rasterize_edge(edge, top_isect_cc_x, top_isect_cc_y, top_isect_cc_w, cc_x,
-                     cc_y, cc_w);
+      rasterize_edge(edge, cur_sx, screen_height * 256, bot_isect_sx,
+                     screen_height * 256);
+      rasterize_edge(edge, bot_isect_sx, screen_height * 256, top_isect_sx, 0);
+      rasterize_edge(edge, top_isect_sx, 0, sx, sy);
     }
   } else if (isect_top) {
-    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, top_isect_cc_x,
-                   top_isect_cc_y, top_isect_cc_w);
-    rasterize_edge(edge, top_isect_cc_x, top_isect_cc_y, top_isect_cc_w, cc_x,
-                   cc_y, cc_w);
+    rasterize_edge(edge, cur_sx, cur_sy, top_isect_sx, 0);
+    rasterize_edge(edge, top_isect_sx, 0, sx, sy);
   } else {
-    rasterize_edge(edge, cur_cc_x, cur_cc_y, cur_cc_w, bot_isect_cc_x,
-                   bot_isect_cc_y, bot_isect_cc_w);
-    rasterize_edge(edge, bot_isect_cc_x, bot_isect_cc_y, bot_isect_cc_w, cc_x,
-                   cc_y, cc_w);
+    rasterize_edge(edge, cur_sx, cur_sy, bot_isect_sx, screen_height * 256);
+    rasterize_edge(edge, bot_isect_sx, screen_height * 256, sx, sy);
   }
 }
 
-__attribute__((noinline)) static void
-rasterize_edge(uint8_t *edge, int16_t cur_cc_x, int16_t cur_cc_y,
-               int16_t cur_cc_w, int16_t cc_x, int16_t cc_y, int16_t cc_w) {
-  Log lcur_cc_w = cur_cc_w;
-  Log lcc_w = cc_w;
-
-  Log lcur_sx = Log(cur_cc_x) / lcur_cc_w;
-  Log lcur_sy = Log(cur_cc_y) / lcur_cc_w;
-
-  Log lsx = Log(cc_x) / lcc_w;
-  Log lsy = Log(cc_y) / lcc_w;
-
-  uint16_t cur_sx = lsx_to_sx(lcur_sx);
-  uint16_t cur_sy = lsy_to_sy(lcur_sy);
-  uint16_t sx = lsx_to_sx(lsx);
-  uint16_t sy = lsy_to_sy(lsy);
+static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
+                           uint16_t sx, uint16_t sy) {
   DEBUG("Rasterize edge: (%u,%u) to (%u,%u)\n", cur_sx, cur_sy, sx, sy);
 
   Log lm = Log(sy - cur_sy) / Log(sx - cur_sx);
