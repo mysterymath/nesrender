@@ -361,6 +361,11 @@ static uint8_t s_to_p(uint16_t s) {
 static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
                                     int16_t cur_cc_y, int16_t cur_cc_w,
                                     int16_t cc_x, int16_t cc_y, int16_t cc_w) {
+  Log lcur_cc_w = cur_cc_w;
+  Log lcc_w = cc_w;
+  uint16_t cur_sx = lsx_to_sx(Log(cur_cc_x) / lcur_cc_w);
+  uint16_t sx = lsx_to_sx(Log(cc_x) / lcc_w);
+
   const uint8_t CUR_ABOVE_TOP = 1 << 0;
   const uint8_t CUR_BELOW_BOT = 1 << 1;
   const uint8_t ABOVE_TOP = 1 << 2;
@@ -388,11 +393,7 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
     outcode &= ~(CUR_BELOW_BOT | BELOW_BOT);
   }
 
-  Log lcur_cc_w = cur_cc_w;
-  uint16_t cur_sx = lsx_to_sx(Log(cur_cc_x) / lcur_cc_w);
   uint16_t cur_sy = lsy_to_sy(Log(cur_cc_y) / lcur_cc_w);
-  Log lcc_w = cc_w;
-  uint16_t sx = lsx_to_sx(Log(cc_x) / lcc_w);
   uint16_t sy = lsy_to_sy(Log(cc_y) / lcc_w);
 
   if (!outcode) {
