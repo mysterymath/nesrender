@@ -52,7 +52,8 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   Log lleft_bound, lright_bound;
   sector = first_portal(&lleft_bound, &lright_bound);
   sector_is_portal = true;
-  printf("%d %d\n", lleft_bound.exp, lright_bound.exp);
+  printf("%d %d %d %d\n", lleft_bound.sign, lleft_bound.exp, lright_bound.sign,
+         lright_bound.exp);
 #if 0
   while (sector) {
     clear_col_z();
@@ -74,19 +75,28 @@ static const Sector *first_portal(Log *lleft_bound, Log *lright_bound) {
   }
   if (!portal)
     return nullptr;
-  uint8_t left_idx = i;
-  uint8_t right_idx;
-  for (right_idx = left_idx;
-       right_idx < ARRAY_LENGTH(portals) && portals[right_idx] == portal;
-       right_idx++)
+
+  // NOTE: The actual portal's coordinates begin at the left edge of the left
+  // column, but end at the right edge of the right column.
+  uint8_t left_col = i;
+  uint8_t right_col;
+  for (right_col = left_col;
+       right_col < ARRAY_LENGTH(portals) && portals[right_col] == portal;
+       right_col++)
     ;
-  // Index Coordinates for screen run from 0 to screen_width = 64
-  // Log numbers run from -1 to 1
-  const auto to_lsx = [](uint8_t idx) {
-    return Log(idx - 32) / Log::pow2(5);
-  };
-  *lleft_bound = to_lsx(left_idx);
-  *lright_bound = to_lsx(right_idx);
+  // Note: Screen in lns space is 2 wide. In pixel space it's 64 wide.
+  // l(x) = ax + b
+  // l(0) = -1 = ax + b = b
+  // l(63) = 1 - 2/64 = (64 - 2) / 64 = 62 / 64 = 31 / 32 = a(63) - 1
+  // 63 / 32 = 63a
+  // a = 1 / 32
+  *lleft_bound = Log(left_col - 32) / Log::pow2(5);
+  // r(x) = ax + b
+  // r(0) = -32/32 + 1/32 = b = -31/32
+  // r(63) = 1 = 63a + b = 63a - 31/32
+  // 63a = 32/32 + 31/32 = 63/32
+  // a = 1/32
+  *lright_bound = Log(right_col - 31) / Log::pow2(5);
   return portal;
 }
 
