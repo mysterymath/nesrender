@@ -52,6 +52,7 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   Log lleft_bound, lright_bound;
   sector = first_portal(&lleft_bound, &lright_bound);
   sector_is_portal = true;
+  printf("%d %d\n", lleft_bound.exp, lright_bound.exp);
 #if 0
   while (sector) {
     clear_col_z();
