@@ -25,7 +25,7 @@ static void setup_camera();
 static void draw_sector();
 static void begin_loop();
 static void draw_wall();
-static const Sector *first_portal();
+static const Sector *first_portal(Log *lleft_bound, Log *lright_bound);
 extern "C" void clear_coverage();
 static void update_coverage();
 
@@ -49,21 +49,44 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   sector = map.player_sector;
   sector_is_portal = false;
   draw_sector();
-  sector = first_portal();
+  Log lleft_bound, lright_bound;
+  sector = first_portal(&lleft_bound, &lright_bound);
   sector_is_portal = true;
+#if 0
   while (sector) {
     clear_col_z();
     update_coverage();
     draw_sector();
-    sector = first_portal();
+    sector = first_portal(&lleft_bound, &lright_bound);
   }
+#endif
 }
 
-static const Sector *first_portal() {
-  for (uint8_t i = 0; i < ARRAY_LENGTH(portals); i++)
-    if (portals[i])
-      return portals[i];
-  return nullptr;
+static const Sector *first_portal(Log *lleft_bound, Log *lright_bound) {
+  const Sector *portal = nullptr;
+  uint8_t i;
+  for (i = 0; i < ARRAY_LENGTH(portals); i++) {
+    if (portals[i]) {
+      portal = portals[i];
+      break;
+    }
+  }
+  if (!portal)
+    return nullptr;
+  uint8_t left_idx = i;
+  uint8_t right_idx;
+  for (right_idx = left_idx;
+       right_idx < ARRAY_LENGTH(portals) && portals[right_idx] == portal;
+       right_idx++)
+    ;
+  // Index Coordinates for screen run from 0 to screen_width = 64
+  // Log numbers run from -1 to 1
+  const auto to_lsx = [](uint8_t idx) {
+    return Log(idx - 32) / Log::pow2(5);
+  };
+  *lleft_bound = to_lsx(left_idx);
+  *lright_bound = to_lsx(right_idx);
+  return portal;
 }
 
 static uint8_t py_tops[64];
