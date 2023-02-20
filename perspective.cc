@@ -52,16 +52,12 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   Log lleft_bound, lright_bound;
   sector = first_portal(&lleft_bound, &lright_bound);
   sector_is_portal = true;
-  printf("%d %d %d %d\n", lleft_bound.sign, lleft_bound.exp, lright_bound.sign,
-         lright_bound.exp);
-#if 0
   while (sector) {
     clear_col_z();
     update_coverage();
     draw_sector();
     sector = first_portal(&lleft_bound, &lright_bound);
   }
-#endif
 }
 
 static const Sector *first_portal(Log *lleft_bound, Log *lright_bound) {
@@ -186,6 +182,20 @@ static uint16_t lsy_to_sy(Log lsy);
 static uint16_t lsz_to_sz(Log lsy);
 
 static uint8_t s_to_p(uint16_t s);
+
+static uint16_t lsx_to_sx(Log lsx) {
+  if (lsx.abs() == Log::one())
+    return lsx.sign ? 0 : screen_width * 256;
+  else
+    return lsx * Log::pow2(13) + screen_width / 2 * 256;
+}
+
+static uint16_t lsy_to_sy(Log lsy) {
+  if (lsy.abs() == Log::one())
+    return lsy.sign ? 0 : screen_height * 256;
+  else
+    return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
+}
 
 __attribute__((noinline)) static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
@@ -326,8 +336,8 @@ __attribute__((noinline)) static void draw_wall() {
       }
     }
 
-    uint16_t cur_sx = lsy_to_sy(Log(cur_cc_x) / Log(cur_cc_w));
-    uint16_t sx = lsy_to_sy(Log(cc_x) / Log(cc_w));
+    uint16_t cur_sx = lsx_to_sx(Log(cur_cc_x) / Log(cur_cc_w));
+    uint16_t sx = lsx_to_sx(Log(cc_x) / Log(cc_w));
 
     clip_and_rasterize_edge(py_tops, cur_cc_x, cur_cc_y_top, cur_cc_w, cur_sx,
                             cc_x, cc_y_top, cc_w, sx);
@@ -369,20 +379,6 @@ done:
   cur_cc_y_top = orig_cc_y_top;
   cur_cc_y_bot = orig_cc_y_bot;
   cur_cc_w = orig_cc_w;
-}
-
-static uint16_t lsx_to_sx(Log lsx) {
-  if (lsx.abs() == Log::one())
-    return lsx.sign ? 0 : screen_width * 256;
-  else
-    return lsx * Log::pow2(13) + screen_width / 2 * 256;
-}
-
-static uint16_t lsy_to_sy(Log lsy) {
-  if (lsy.abs() == Log::one())
-    return lsy.sign ? 0 : screen_height * 256;
-  else
-    return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
 }
 
 static uint16_t lsz_to_sz(Log lsz) { return (32768 + lsz * Log::pow2(15)) * 2; }
