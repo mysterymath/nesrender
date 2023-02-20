@@ -31,6 +31,7 @@ add_library(maps
 
 target_link_libraries(render neslib nesdoug maps)
 target_include_directories(render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_options(render PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld)
 
 set_property(SOURCE chr.s PROPERTY
 	OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sprites.chr ${CMAKE_CURRENT_SOURCE_DIR}/pixels.chr)
