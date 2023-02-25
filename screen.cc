@@ -42,7 +42,7 @@ __attribute__((constructor)) static void init() {
   }
 }
 
-void present() {
+__attribute__((noinline)) void present() {
   static uint8_t x;
   static uint8_t *next_col;
   static uint8_t *cur_col;
