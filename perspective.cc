@@ -150,10 +150,8 @@ static void clip_bot_and_draw_to(Log lm_top, Log lm_bot, int16_t cc_x,
                                  int16_t cc_y_top, int16_t cc_y_bot,
                                  int16_t cc_w);
 
-static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
-                                    int16_t cur_cc_y, int16_t cur_cc_w,
-                                    uint16_t cur_sx, int16_t cc_x, int16_t cc_y,
-                                    int16_t cc_w, uint16_t sx);
+static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_y,
+                                    int16_t cc_y);
 static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
                            uint16_t sx, uint16_t sy);
 
@@ -182,10 +180,12 @@ static uint16_t lsy_to_sy(Log lsy) {
 // w_near must be at least 32.
 constexpr int16_t w_near = 32;
 
+int16_t cc_x, cc_w;
+uint16_t cur_sx, sx;
+
 static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
 
-  int16_t cc_x, cc_w;
   xy_to_cc(next_wall->x, next_wall->y, &cc_x, &cc_w);
 
   int16_t cc_y_top, cc_y_bot;
@@ -322,13 +322,11 @@ static void draw_wall() {
       }
     }
 
-    uint16_t cur_sx = lsx_to_sx(Log(cur_cc_x) / Log(cur_cc_w));
-    uint16_t sx = lsx_to_sx(Log(cc_x) / Log(cc_w));
+    cur_sx = lsx_to_sx(Log(cur_cc_x) / Log(cur_cc_w));
+    sx = lsx_to_sx(Log(cc_x) / Log(cc_w));
 
-    clip_and_rasterize_edge(py_tops, cur_cc_x, cur_cc_y_top, cur_cc_w, cur_sx,
-                            cc_x, cc_y_top, cc_w, sx);
-    clip_and_rasterize_edge(py_bots, cur_cc_x, cur_cc_y_bot, cur_cc_w, cur_sx,
-                            cc_x, cc_y_bot, cc_w, sx);
+    clip_and_rasterize_edge(py_tops, cur_cc_y_top, cc_y_top);
+    clip_and_rasterize_edge(py_bots, cur_cc_y_bot, cc_y_bot);
 
     if (wall->portal) {
       has_ceiling_step = wall->portal->ceiling_z < sector->ceiling_z;
@@ -336,16 +334,14 @@ static void draw_wall() {
         // TODO: Slopes.
         int16_t ceiling_cc_y;
         z_to_cc(wall->portal->ceiling_z, &ceiling_cc_y);
-        clip_and_rasterize_edge(py_ceiling_steps, cur_cc_x, ceiling_cc_y,
-                                cur_cc_w, cc_x, cur_sx, ceiling_cc_y, cc_w, sx);
+        clip_and_rasterize_edge(py_ceiling_steps, ceiling_cc_y, ceiling_cc_y);
       }
       has_floor_step = wall->portal->floor_z > sector->floor_z;
       if (has_floor_step) {
         // TODO: Slopes.
         int16_t floor_cc_y;
         z_to_cc(wall->portal->floor_z, &floor_cc_y);
-        clip_and_rasterize_edge(py_floor_steps, cur_cc_x, floor_cc_y, cur_cc_w,
-                                cur_sx, cc_x, floor_cc_y, cc_w, sx);
+        clip_and_rasterize_edge(py_floor_steps, floor_cc_y, floor_cc_y);
       }
     }
 
@@ -373,10 +369,8 @@ static uint8_t s_to_p(uint16_t s) {
   return s % 256 <= 128 ? s / 256 : s / 256 + 1;
 }
 
-static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
-                                    int16_t cur_cc_y, int16_t cur_cc_w,
-                                    uint16_t cur_sx, int16_t cc_x, int16_t cc_y,
-                                    int16_t cc_w, uint16_t sx) {
+static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_y,
+                                    int16_t cc_y) {
   const uint8_t CUR_ABOVE_TOP = 1 << 0;
   const uint8_t CUR_BELOW_BOT = 1 << 1;
   const uint8_t ABOVE_TOP = 1 << 2;
