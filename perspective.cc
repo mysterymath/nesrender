@@ -197,7 +197,7 @@ __attribute__((noinline)) static void draw_wall() {
   uint8_t cur_outcode = 0;
   if (cur_cc_x < -cur_cc_w)
     cur_outcode |= LEFT;
-  if (cur_cc_x > cur_cc_w)
+  else if (cur_cc_x > cur_cc_w)
     cur_outcode |= RIGHT;
   if (cur_cc_w < 1)
     cur_outcode |= BEHIND;
@@ -205,9 +205,9 @@ __attribute__((noinline)) static void draw_wall() {
   uint8_t outcode = 0;
   if (cc_x < -cc_w)
     outcode |= LEFT;
-  if (cc_x > cc_w)
+  else if (cc_x > cc_w)
     outcode |= RIGHT;
-  if (cc_w <= 0)
+  if (cc_w <= 1)
     outcode |= BEHIND;
 
   // Frustum cull.
@@ -375,11 +375,11 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
   uint8_t outcode = 0;
   if (cur_cc_y < -cur_cc_w)
     outcode |= CUR_ABOVE_TOP;
-  if (cur_cc_y > cur_cc_w)
+  else if (cur_cc_y > cur_cc_w)
     outcode |= CUR_BELOW_BOT;
   if (cc_y < -cc_w)
     outcode |= ABOVE_TOP;
-  if (cc_y > cc_w)
+  else if (cc_y > cc_w)
     outcode |= BELOW_BOT;
 
   if ((outcode & (CUR_ABOVE_TOP | ABOVE_TOP)) == (CUR_ABOVE_TOP | ABOVE_TOP)) {
