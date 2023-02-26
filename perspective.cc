@@ -388,6 +388,13 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
   else if (cc_y > cc_w)
     outcode |= BELOW_BOT;
 
+  if (!outcode) {
+    uint16_t cur_sy = lsy_to_sy(Log(cur_cc_y) / Log(cur_cc_w));
+    uint16_t sy = lsy_to_sy(Log(cc_y) / Log(cc_w));
+    rasterize_edge(edge, cur_sx, cur_sy, sx, sy);
+    return;
+  }
+
   if ((outcode & (CUR_ABOVE_TOP | ABOVE_TOP)) == (CUR_ABOVE_TOP | ABOVE_TOP)) {
     DEBUG("Clipped both sides to top.\n");
     cur_cc_y = -cur_cc_w;
@@ -403,11 +410,6 @@ static void clip_and_rasterize_edge(uint8_t *edge, int16_t cur_cc_x,
 
   uint16_t cur_sy = lsy_to_sy(Log(cur_cc_y) / Log(cur_cc_w));
   uint16_t sy = lsy_to_sy(Log(cc_y) / Log(cc_w));
-
-  if (!outcode) {
-    rasterize_edge(edge, cur_sx, cur_sy, sx, sy);
-    return;
-  }
 
   int16_t dx = cc_x - cur_cc_x;
   int16_t dy = cc_y - cur_cc_y;
