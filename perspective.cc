@@ -174,6 +174,11 @@ static uint16_t lsy_to_sy(Log lsy) {
     return lsy * lh_over_2_times_256 + screen_height / 2 * 256;
 }
 
+// If we clip to w_near, then one of the vertices will be at that w. We'd like
+// it to be such that that vertex could resolve to any column of the screen, so
+// w_near must be at least 32.
+constexpr int16_t w_near = 32;
+
 __attribute__((noinline)) static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
 
@@ -199,7 +204,7 @@ __attribute__((noinline)) static void draw_wall() {
     cur_outcode |= LEFT;
   else if (cur_cc_x > cur_cc_w)
     cur_outcode |= RIGHT;
-  if (cur_cc_w < 1)
+  if (cur_cc_w < w_near)
     cur_outcode |= BEHIND;
 
   uint8_t outcode = 0;
@@ -229,30 +234,31 @@ __attribute__((noinline)) static void draw_wall() {
       Log ldy_bot = dy_bot;
       Log ldw = dw;
 
-      if (cur_cc_w < 1) {
-        // w = 1 = cur_w + dw*t
-        Log t = Log(1 - cur_cc_w) / ldw;
+      if (cur_cc_w < w_near) {
+        // w = w_near = cur_w + dw*t
+        Log t = Log(w_near - cur_cc_w) / ldw;
         cur_cc_x += ldx * t;
         cur_cc_y_top += ldy_top * t;
         cur_cc_y_bot += ldy_bot * t;
-        cur_cc_w = 1;
+        cur_cc_w = w_near;
+
         cur_outcode = 0;
         if (cur_cc_x < -cur_cc_w)
           cur_outcode |= LEFT;
-        if (cur_cc_x > cur_cc_w)
+        else if (cur_cc_x > cur_cc_w)
           cur_outcode |= RIGHT;
         DEBUG("Clipped cur to w=1.\n");
         DEBUG_CC("Cur", cur_cc);
       } else {
-        Log t = Log(1 - cc_w) / ldw;
+        Log t = Log(w_near - cc_w) / ldw;
         cc_x += ldx * t;
         cc_y_top += ldy_top * t;
         cc_y_bot += ldy_bot * t;
-        cc_w = 1;
+        cc_w = w_near;
         outcode = 0;
         if (cc_x < -cc_w)
           outcode |= LEFT;
-        if (cc_x > cc_w)
+        else if (cc_x > cc_w)
           outcode |= RIGHT;
         DEBUG("Clipped next to w=1.\n");
         DEBUG_CC("Next", cc);
