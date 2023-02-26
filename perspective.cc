@@ -25,7 +25,7 @@ static void setup_camera();
 static void draw_sector();
 static void begin_loop();
 static void draw_wall();
-static const Sector *first_portal(Log *lleft_bound, Log *lright_bound);
+static void next_sector();
 extern "C" void clear_coverage();
 static void update_coverage();
 
@@ -36,6 +36,7 @@ static const Wall *wall;
 static const Wall *next_wall;
 
 static const Sector *portals[64];
+Log lleft_bound, lright_bound;
 
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -50,50 +51,49 @@ __attribute__((noinline)) void perspective::render(const Map &map) {
   sector_is_portal = false;
   draw_sector();
   Log lleft_bound, lright_bound;
-  sector = first_portal(&lleft_bound, &lright_bound);
-  sector_is_portal = true;
+
+  next_sector();
   while (sector) {
     clear_col_z();
     update_coverage();
     draw_sector();
-    sector = first_portal(&lleft_bound, &lright_bound);
+    next_sector();
   }
 }
 
-static const Sector *first_portal(Log *lleft_bound, Log *lright_bound) {
-  const Sector *portal = nullptr;
+static void next_sector() {
+  sector = nullptr;
   uint8_t i;
   for (i = 0; i < ARRAY_LENGTH(portals); i++) {
     if (portals[i]) {
-      portal = portals[i];
+      sector = portals[i];
       break;
     }
   }
-  if (!portal)
-    return nullptr;
+  if (!sector)
+    return;
+  sector_is_portal = true;
 
   // NOTE: The actual portal's coordinates begin at the left edge of the left
   // column, but end at the right edge of the right column.
   uint8_t left_col = i;
   uint8_t right_col;
-  for (right_col = left_col;
-       right_col < ARRAY_LENGTH(portals) && portals[right_col] == portal;
-       right_col++)
-    ;
+  for (uint8_t i = left_col; i < ARRAY_LENGTH(portals); i++)
+    if (portals[i] == sector)
+      right_col = i;
   // Note: Screen in lns space is 2 wide. In pixel space it's 64 wide.
   // l(x) = ax + b
   // l(0) = -1 = ax + b = b
   // l(63) = 1 - 2/64 = (64 - 2) / 64 = 62 / 64 = 31 / 32 = a(63) - 1
   // 63 / 32 = 63a
   // a = 1 / 32
-  *lleft_bound = Log(left_col - 32) / Log::pow2(5);
+  lleft_bound = Log(left_col - 32) / Log::pow2(5);
   // r(x) = ax + b
   // r(0) = -32/32 + 1/32 = b = -31/32
   // r(63) = 1 = 63a + b = 63a - 31/32
   // 63a = 32/32 + 31/32 = 63/32
   // a = 1/32
-  *lright_bound = Log(right_col - 31) / Log::pow2(5);
-  return portal;
+  lright_bound = Log(right_col - 31) / Log::pow2(5);
 }
 
 static uint8_t py_tops[64];
