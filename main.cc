@@ -43,7 +43,7 @@ int main() {
   pal_spr(spr_pal);
   bank_spr(1);
   if (overhead_view)
-    oam_spr(128 - 4, 120 - 4, 0, 0);
+    oam_spr(128 - 4, 120 - 4, 10, 0);
   ppu_on_all();
 
   load_map(*maps[0]);
@@ -78,7 +78,7 @@ __attribute__((noinline)) static void update() {
     overhead_view = !overhead_view;
     set_prg_bank(overhead_view);
     if (overhead_view)
-      oam_spr(128 - 4, 120 - 4, 0, 0);
+      oam_spr(128 - 4, 120 - 4, 10, 0);
     else
       oam_clear();
   }
