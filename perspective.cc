@@ -502,6 +502,7 @@ static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
   int16_t m = lm * Log::pow2(8);
   DEBUG("m: %d\n", m);
 
+#if 0
   // Adjust to the next pixel center.
   int16_t offset = 128 - cur_sx % 256;
   if (offset < 0)
@@ -515,6 +516,7 @@ static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
       cur_sy += lm * loffset;
     DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
   }
+#endif
 
   int16_t icur_sy = cur_sy;
   uint8_t px = s_to_p(sx);
