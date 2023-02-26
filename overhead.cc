@@ -1,5 +1,6 @@
 #include "overhead.h"
 
+#include <bank.h>
 #include <neslib.h>
 
 #include "draw.h"
@@ -7,6 +8,12 @@
 #include "screen.h"
 #include "trig.h"
 #include "util.h"
+
+void overhead::begin() {
+  set_prg_bank(1);
+  oam_spr(128 - 4, 120 - 4, 10, 0);
+}
+void overhead::end() { oam_spr(0, 0xff, 0, 0); }
 
 #pragma clang section text = ".prg_rom_1.text" rodata = ".prg_rom_1.rodata"
 
@@ -22,9 +29,7 @@ static void setup_camera();
 static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
-__attribute__((noinline)) void overhead::render(const Map &map) {
-  oam_spr(128 - 4, 120 - 4, 10, 0);
-
+void overhead::render(const Map &map) {
   clear_screen();
   setup_camera();
   Sector &s = *map.player_sector;

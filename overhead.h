@@ -7,6 +7,8 @@
 
 namespace overhead {
 
+void begin(void);
+void end(void);
 void render(const Map &map);
 void scale_up();
 void scale_down();

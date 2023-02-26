@@ -11,6 +11,9 @@
 #include "trig.h"
 #include "util.h"
 
+void perspective::begin() {}
+void perspective::end() {}
+
 #pragma clang section text = ".prg_rom_0.text" rodata = ".prg_rom_0.rodata"
 
 // #define DEBUG_FILE
@@ -39,7 +42,7 @@ static const Sector *portals[64];
 
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
 
-__attribute__((noinline)) void perspective::render(const Map &map) {
+void perspective::render(const Map &map) {
   DEBUG("Begin frame.\n");
   clear_col_z();
   clear_coverage();
@@ -179,7 +182,7 @@ static uint16_t lsy_to_sy(Log lsy) {
 // w_near must be at least 32.
 constexpr int16_t w_near = 32;
 
-__attribute__((noinline)) static void draw_wall() {
+static void draw_wall() {
   DEBUG("Draw to: (%u,%u)\n", next_wall->x, next_wall->y);
 
   int16_t cc_x, cc_w;

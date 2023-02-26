@@ -37,12 +37,15 @@ int main() {
   static const uint8_t spr_pal[16] = {0x00, 0x00, 0x10, 0x30};
   ppu_off();
   set_mmc1_ctrl(0b01100);
-  set_prg_bank(overhead_view);
   pal_bright(4);
   pal_bg(bg_pal);
   pal_spr(spr_pal);
   bank_spr(1);
   ppu_on_all();
+  if (overhead_view)
+    overhead::begin();
+  else
+    perspective::begin();
 
   load_map(*maps[0]);
   uint8_t last_update = get_frame_count();
@@ -55,7 +58,7 @@ int main() {
     if (!still_presenting) {
       uint8_t cur_render = get_frame_count();
       uint8_t fps = 60 / (cur_render - last_render);
-      oam_clear();
+      oam_set(1);
       oam_spr(0, 0, fps / 10, 0);
       oam_spr(8, 0, fps % 10, 0);
       if (overhead_view)
@@ -70,16 +73,23 @@ int main() {
   }
 }
 
-__attribute__((noinline)) static void idle(uint8_t last_present) {
+static void idle(uint8_t last_present) {
   while (get_frame_count() == last_present)
     ;
 }
 
-__attribute__((noinline)) static void update() {
+static void update() {
   uint8_t pad_t = pad_trigger(0);
   uint8_t pad = pad_state(0);
 
   if (pad_t & PAD_START) {
+    if (overhead_view) {
+      overhead::end();
+      perspective::begin();
+    } else {
+      perspective::end();
+      overhead::begin();
+    }
     overhead_view = !overhead_view;
     set_prg_bank(overhead_view);
   }

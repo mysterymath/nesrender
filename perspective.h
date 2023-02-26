@@ -5,6 +5,8 @@
 
 namespace perspective {
 
+void begin();
+void end();
 void render(const Map &map);
 
 } // namespace perspective
