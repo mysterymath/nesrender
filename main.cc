@@ -42,22 +42,27 @@ int main() {
   pal_bg(bg_pal);
   pal_spr(spr_pal);
   bank_spr(1);
-  if (overhead_view)
-    oam_spr(128 - 4, 120 - 4, 10, 0);
   ppu_on_all();
 
   load_map(*maps[0]);
   uint8_t last_update = get_frame_count();
+  uint8_t last_render = get_frame_count();
   uint8_t last_present = get_frame_count();
   while (true) {
     uint8_t cur_update = get_frame_count();
     for (; last_update != cur_update; ++last_update)
       update();
     if (!still_presenting) {
+      uint8_t cur_render = get_frame_count();
+      uint8_t fps = 60 / (cur_render - last_render);
+      oam_clear();
+      oam_spr(0, 0, fps % 10, 0);
+      oam_spr(8, 0, fps / 10, 0);
       if (overhead_view)
         overhead::render(*maps[cur_map_idx]);
       else
         perspective::render(*maps[cur_map_idx]);
+      last_render = cur_render;
     }
     idle(last_present);
     present();
@@ -77,10 +82,6 @@ __attribute__((noinline)) static void update() {
   if (pad_t & PAD_START) {
     overhead_view = !overhead_view;
     set_prg_bank(overhead_view);
-    if (overhead_view)
-      oam_spr(128 - 4, 120 - 4, 10, 0);
-    else
-      oam_clear();
   }
   if (pad_t & PAD_SELECT) {
     if (++cur_map_idx == sizeof(maps) / sizeof(Map *))

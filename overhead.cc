@@ -1,5 +1,7 @@
 #include "overhead.h"
 
+#include <neslib.h>
+
 #include "draw.h"
 #include "log.h"
 #include "screen.h"
@@ -21,6 +23,8 @@ static void move_to(uint16_t x, uint16_t y);
 static void draw_to(uint16_t x, uint16_t y);
 
 __attribute__((noinline)) void overhead::render(const Map &map) {
+  oam_spr(128 - 4, 120 - 4, 10, 0);
+
   clear_screen();
   setup_camera();
   Sector &s = *map.player_sector;
