@@ -42,6 +42,11 @@ __attribute__((constructor)) static void init() {
   }
 }
 
+__attribute__((section(".zp"))) uint8_t *present_x;
+__attribute__((section(".zp"))) uint8_t *present_next_col;
+__attribute__((section(".zp"))) uint8_t *present_cur_col;
+
+#if 0
 void present() {
   static uint8_t x;
   static uint8_t *next_col;
@@ -83,6 +88,7 @@ done:
   vram_buf[vbi] = 0x60;
   updating_vram = true;
 }
+#endif
 
 asm(".section .nmi.0,\"axR\"\n"
     "\tjsr update_vram\n");

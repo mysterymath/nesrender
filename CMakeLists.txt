@@ -20,6 +20,7 @@ add_executable(render
 	perspective.cc
 	perspective.s
 	screen.cc
+	screen.s
 	trig.cc
 )
 

@@ -10,6 +10,6 @@ extern uint8_t fb_next[960];
 constexpr uint16_t screen_width = 64;
 constexpr uint16_t screen_height = 60;
 
-void present();
+extern "C" void present();
 
 #endif // not SCREEN_H
