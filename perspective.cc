@@ -502,25 +502,17 @@ static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
   int16_t m = lm * Log::pow2(8);
   DEBUG("m: %d\n", m);
 
-#if 0
-  // Adjust to the next pixel center.
+  // Adjust cur_sx to the next pixel center.
   int16_t offset = 128 - cur_sx % 256;
   if (offset < 0)
     offset += 256;
   DEBUG("Offset: %d\n", offset);
-  if (offset) {
-    cur_sx += offset;
-    Log loffset = Log(offset);
-    if ((m >= 0 || cur_sy >= -m) &&
-        (m <= 0 || cur_sy <= screen_height * 256 - m))
-      cur_sy += lm * loffset;
-    DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
-  }
-#endif
+  cur_sx += offset;
+  cur_sy += lm * Log(offset);
+  DEBUG("New cur: %u,%u\n", cur_sx, cur_sy);
 
-  bool off_screen = false;
   uint8_t px = s_to_p(sx);
-  for (uint8_t cur_px = s_to_p(cur_sx); cur_px < px; ++cur_px) {
+  for (uint8_t cur_px = cur_sx / 256; cur_px < px; ++cur_px) {
     uint8_t cur_py = cur_sy / 256;
     if (cur_sy % 256 > 128)
       ++cur_py;
@@ -529,17 +521,7 @@ static void rasterize_edge(uint8_t *edge, uint16_t cur_sx, uint16_t cur_sy,
     if (cur_py > coverage_py_bots[cur_px])
       cur_py = coverage_py_bots[cur_px];
     edge[cur_px] = cur_py;
-    if (!off_screen) {
-      if (m < 0 && cur_sy < -m) {
-        off_screen = true;
-        cur_sy = 0;
-      } else if (m > 0 && cur_sy > (int16_t)(screen_height * 256) - m) {
-        off_screen = true;
-        cur_sy = screen_height * 256;
-      } else {
-        cur_sy += m;
-      }
-    }
+    cur_sy += m;
   }
 }
 
