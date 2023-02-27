@@ -32,7 +32,7 @@ present:
   cmp (present_cur_col),y
   bne 1f
   dey
-  bne .Lloop
+  bpl .Lloop
   jmp .Lnext_x
 1:
   tax
@@ -86,7 +86,7 @@ present:
   inc .Lpresent_vram_buf+1
 1:
   dey
-  bne .Lloop
+  bpl .Lloop
 .Lnext_x:
   clc
   lda present_cur_col
