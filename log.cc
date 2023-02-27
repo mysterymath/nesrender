@@ -81,20 +81,22 @@ Log Log::operator*(const Log &other) const { return (Log)(*this) *= other; }
 Log &Log::operator*=(const Log &other) {
   if (other.sign)
     sign = !sign;
-  if (exp == -32768 || other.exp == -32768)
-    exp = -32768;
-  else
-    exp += other.exp;
+  int16_t newexp;
+  // Underflow occurs whenever we divide zero by something, but overflow should
+  // never occur.
+  if (__builtin_add_overflow(exp, other.exp, &newexp))
+    newexp = -32768;
+  exp = newexp;
   return *this;
 }
 Log Log::operator/(const Log &other) const { return (Log)(*this) /= other; }
 Log &Log::operator/=(const Log &other) {
   if (other.sign)
     sign = !sign;
-  if (exp == -32768 || other.exp == -32768)
-    exp = -32768;
-  else
-    exp -= other.exp;
+  int16_t newexp;
+  if (__builtin_sub_overflow(exp, other.exp, &newexp))
+    newexp = -32768;
+  exp = newexp;
   return *this;
 }
 
