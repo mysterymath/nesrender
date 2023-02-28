@@ -40,6 +40,7 @@ present:
 	lda #>.Lmax_cycles
 	sta .Lpresent_cycles_remaining+1
 
+	; Loop from y=29 to 0, inc
 	ldy #29
 .Lloop:
 	lda (present_next_col),y
@@ -49,8 +50,10 @@ present:
 	bpl .Lloop
 	jmp .Lnext_x
 1:
+	; x := color
 	tax
 
+	; Decrement cycles remaining
 	sec
 	lda .Lpresent_cycles_remaining
 	sbc #(2 + 4 + 2 + 4 + 2 + 4)
@@ -60,16 +63,18 @@ present:
 	sta .Lpresent_cycles_remaining+1
 	bcs 1f
 
+	; Ran out of cycles; quit.
 	lda #1
 	sta still_presenting
 	beq 1f
 	jmp .Ldone
 1:
 	sty .Lpresent_y
+
+	; vram = y * 32
 	tya
 	ldy #0
 	sty .Lpresent_vram
-	; vram = 0x2000 + x + y * 32 == x + y << 5 == x + (y << 8) >> 3
 	lsr
 	ror .Lpresent_vram
 	lsr
@@ -77,6 +82,8 @@ present:
 	lsr
 	ror .Lpresent_vram
 	sta .Lpresent_vram+1
+
+  ; vram += NAMETABLE_A + x
 	clc
 	lda .Lpresent_vram
 	adc present_x
