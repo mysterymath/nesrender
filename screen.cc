@@ -48,10 +48,10 @@ __attribute__((noinline)) void present() {
         continue;
       }
 
-      bool miss;
       uint8_t i = 0;
       const auto ldimm = [&](uint8_t val, bool update_lru) -> uint8_t {
         uint8_t reg;
+        bool miss;
         if (!has_val[0]) {
           reg = 0;
           miss = true;
@@ -78,7 +78,6 @@ __attribute__((noinline)) void present() {
             ;
           miss = true;
         }
-
         if (miss) {
           reg_val[reg] = val;
           vb[i++] = ld_imm[reg];
@@ -100,35 +99,29 @@ __attribute__((noinline)) void present() {
 
         // LD #>vram
         reg = ldimm(vram >> 8, false);
-        if (miss)
-          cycles_remaining -= 2;
         // ST PPUADDR
         vb[i++] = st_abs[reg];
         vb[i++] = 0x06;
         vb[i++] = 0x20;
         // LD #<vram
         reg = ldimm(vram & 0xff, false);
-        if (miss)
-          cycles_remaining -= 2;
         // ST PPUADDR
         vb[i++] = st_abs[reg];
         vb[i++] = 0x06;
         vb[i++] = 0x20;
         consecutive = true;
-        cycles_remaining -= 8;
+        cycles_remaining -= 12;
       } else if (cycles_remaining < 6) {
-          still_presenting = true;
-          goto done;
+        still_presenting = true;
+        goto done;
       }
       reg = ldimm(next_col[y], true);
-      if (miss)
-        cycles_remaining -= 2;
       // ST PPUDATA
       vb[i++] = st_abs[reg];
       vb[i++] = 0x07;
       vb[i++] = 0x20;
       cur_col[y] = next_col[y];
-      cycles_remaining -= 4;
+      cycles_remaining -= 6;
 
       vb += i;
     }
