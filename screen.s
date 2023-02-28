@@ -7,7 +7,8 @@
 .Ly = __rc4
 .Lvram = __rc5 ; +1
 .Lcycles_remaining = __rc7 ; +1
-.zeropage .Lvram_buf, .Ly, .Lvram, .Lcycles_remaining
+.Lis_consec = __rc9
+.zeropage .Lvram_buf, .Ly, .Lvram, .Lcycles_remaining, .Lis_consec
 
 .Lmax_cycles = 1024 + 512 + 128 + 8 ; Empirically determined by not checking against fb_cur
 
@@ -40,15 +41,23 @@ present:
 	lda #>.Lmax_cycles
 	sta .Lcycles_remaining+1
 
-	; Loop from y=29 to 0, inc
-	ldy #29
+	lda #0
+	sta .Lis_consec
+
+	ldy #0
 .Lloop:
 	lda (present_next_col),y
 	cmp (present_cur_col),y
 	bne .Lsend_pixel
-	dey
-	bpl .Lloop
+	ldx #0
+	stx .Lis_consec
+	iny
+	cpy #30
+	bne .Lloop
 .Lnext_x:
+	lda #0
+	sta .Lis_consec
+
 	clc
 	lda present_cur_col
 	adc #30
@@ -63,7 +72,7 @@ present:
 	bcc 1f
 	inc present_next_col+1
 1:
-	ldy #29
+	ldy #0
 	inc present_x
 	lda present_x
 	cmp #32
@@ -100,6 +109,11 @@ present:
 1:
 	sty .Ly
 
+	lda .Lis_consec
+	beq .Lnon_consec
+	ldy #0
+	jmp .Lconsec
+.Lnon_consec:
 	; vram = y * 32
 	tya
 	ldy #0
@@ -155,6 +169,10 @@ present:
 	sta (.Lvram_buf),y
 	iny
 
+	lda #1
+	sta .Lis_consec
+
+.Lconsec:
 	lda #$a9 ; lda #
 	sta (.Lvram_buf),y
 	iny
@@ -172,18 +190,21 @@ present:
 	sta (.Lvram_buf),y
 	iny
 
-	ldy .Ly
-	txa
-	sta (present_cur_col),y
 	clc
-	lda .Lvram_buf
-	adc #15
+	tya
+	adc .Lvram_buf
 	sta .Lvram_buf
 	bcc 1f
 	inc .Lvram_buf+1
 1:
-	dey
-	bmi 1f
+
+	ldy .Ly
+	txa
+	sta (present_cur_col),y
+
+	iny
+	cpy #30
+	beq 1f
 	jmp .Lloop
 1:
 	jmp .Lnext_x
