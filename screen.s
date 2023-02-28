@@ -3,11 +3,11 @@
 .include "imag.inc"
 .zeropage present_x, present_next_col, present_cur_col
 
-.Lpresent_vram_buf = __rc2 ; +1
-.Lpresent_y = __rc4
-.Lpresent_vram = __rc5 ; +1
-.Lpresent_cycles_remaining = __rc7 ; +1
-.zeropage .Lpresent_vram_buf, .Lpresent_y, .Lpresent_vram, .Lpresent_cycles_remaining
+.Lvram_buf = __rc2 ; +1
+.Ly = __rc4
+.Lvram = __rc5 ; +1
+.Lcycles_remaining = __rc7 ; +1
+.zeropage .Lvram_buf, .Ly, .Lvram, .Lcycles_remaining
 
 .Lmax_cycles = 1024 + 512 + 128 + 8 ; Empirically determined by not checking against fb_cur
 
@@ -31,131 +31,23 @@ present:
 	sta present_cur_col+1
 1:
 	lda #<vram_buf
-	sta .Lpresent_vram_buf
+	sta .Lvram_buf
 	lda #>vram_buf
-	sta .Lpresent_vram_buf+1
+	sta .Lvram_buf+1
 
 	lda #<.Lmax_cycles
-	sta .Lpresent_cycles_remaining
+	sta .Lcycles_remaining
 	lda #>.Lmax_cycles
-	sta .Lpresent_cycles_remaining+1
+	sta .Lcycles_remaining+1
 
 	; Loop from y=29 to 0, inc
 	ldy #29
 .Lloop:
 	lda (present_next_col),y
 	cmp (present_cur_col),y
-	bne 1f
+	bne .Lsend_pixel
 	dey
 	bpl .Lloop
-	jmp .Lnext_x
-1:
-	; x := color
-	tax
-
-	; Decrement cycles remaining
-	sec
-	lda .Lpresent_cycles_remaining
-	sbc #(2 + 4 + 2 + 4 + 2 + 4)
-	sta .Lpresent_cycles_remaining
-	lda .Lpresent_cycles_remaining+1
-	sbc #0
-	sta .Lpresent_cycles_remaining+1
-	bcs 1f
-
-	; Ran out of cycles; quit.
-	lda #1
-	sta still_presenting
-	beq 1f
-	jmp .Ldone
-1:
-	sty .Lpresent_y
-
-	; vram = y * 32
-	tya
-	ldy #0
-	sty .Lpresent_vram
-	lsr
-	ror .Lpresent_vram
-	lsr
-	ror .Lpresent_vram
-	lsr
-	ror .Lpresent_vram
-	sta .Lpresent_vram+1
-
-  ; vram += NAMETABLE_A + x
-	clc
-	lda .Lpresent_vram
-	adc present_x
-	sta .Lpresent_vram
-	lda .Lpresent_vram+1
-	adc #$20 ; >NAMETABLE_A
-	sta .Lpresent_vram+1
-
-	lda #$a9 ; lda #
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda .Lpresent_vram+1
-	sta (.Lpresent_vram_buf),y
-	iny
-
-	lda #$8d ; sta abs
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda #<PPUADDR
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda #>PPUADDR
-	sta (.Lpresent_vram_buf),y
-	iny
-
-	lda #$a9 ; lda #
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda .Lpresent_vram
-	sta (.Lpresent_vram_buf),y
-	iny
-
-	lda #$8d ; sta abs
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda #<PPUADDR
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda #>PPUADDR
-	sta (.Lpresent_vram_buf),y
-	iny
-
-	lda #$a9 ; lda #
-	sta (.Lpresent_vram_buf),y
-	iny
-	txa	; color
-	sta (.Lpresent_vram_buf),y
-	iny
-
-	lda #$8d ; sta abs
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda #<PPUDATA
-	sta (.Lpresent_vram_buf),y
-	iny
-	lda #>PPUDATA
-	sta (.Lpresent_vram_buf),y
-	iny
-
-	ldy .Lpresent_y
-	txa
-	sta (present_cur_col),y
-	clc
-	lda .Lpresent_vram_buf
-	adc #15
-	sta .Lpresent_vram_buf
-	bcc 1f
-	inc .Lpresent_vram_buf+1
-1:
-	dey
-	bmi .Lnext_x
-	jmp .Lloop
 .Lnext_x:
 	clc
 	lda present_cur_col
@@ -175,15 +67,123 @@ present:
 	inc present_x
 	lda present_x
 	cmp #32
-	beq 1f
-	jmp .Lloop
+	bne .Lloop
 1:
 	lda #0
 	sta still_presenting
 .Ldone:
 	ldy #0
 	lda #$60
-	sta (.Lpresent_vram_buf),y
+	sta (.Lvram_buf),y
 	iny
 	sty updating_vram
 	rts
+.Lsend_pixel:
+	; x := color
+	tax
+
+	; Decrement cycles remaining
+	sec
+	lda .Lcycles_remaining
+	sbc #(2 + 4 + 2 + 4 + 2 + 4)
+	sta .Lcycles_remaining
+	lda .Lcycles_remaining+1
+	sbc #0
+	sta .Lcycles_remaining+1
+	bcs 1f
+
+	; Ran out of cycles; quit.
+	lda #1
+	sta still_presenting
+	jmp .Ldone
+
+1:
+	sty .Ly
+
+	; vram = y * 32
+	tya
+	ldy #0
+	sty .Lvram
+	lsr
+	ror .Lvram
+	lsr
+	ror .Lvram
+	lsr
+	ror .Lvram
+	sta .Lvram+1
+
+  ; vram += NAMETABLE_A + x
+	clc
+	lda .Lvram
+	adc present_x
+	sta .Lvram
+	lda .Lvram+1
+	adc #$20 ; >NAMETABLE_A
+	sta .Lvram+1
+
+	lda #$a9 ; lda #
+	sta (.Lvram_buf),y
+	iny
+	lda .Lvram+1
+	sta (.Lvram_buf),y
+	iny
+
+	lda #$8d ; sta abs
+	sta (.Lvram_buf),y
+	iny
+	lda #<PPUADDR
+	sta (.Lvram_buf),y
+	iny
+	lda #>PPUADDR
+	sta (.Lvram_buf),y
+	iny
+
+	lda #$a9 ; lda #
+	sta (.Lvram_buf),y
+	iny
+	lda .Lvram
+	sta (.Lvram_buf),y
+	iny
+
+	lda #$8d ; sta abs
+	sta (.Lvram_buf),y
+	iny
+	lda #<PPUADDR
+	sta (.Lvram_buf),y
+	iny
+	lda #>PPUADDR
+	sta (.Lvram_buf),y
+	iny
+
+	lda #$a9 ; lda #
+	sta (.Lvram_buf),y
+	iny
+	txa	; color
+	sta (.Lvram_buf),y
+	iny
+
+	lda #$8d ; sta abs
+	sta (.Lvram_buf),y
+	iny
+	lda #<PPUDATA
+	sta (.Lvram_buf),y
+	iny
+	lda #>PPUDATA
+	sta (.Lvram_buf),y
+	iny
+
+	ldy .Ly
+	txa
+	sta (present_cur_col),y
+	clc
+	lda .Lvram_buf
+	adc #15
+	sta .Lvram_buf
+	bcc 1f
+	inc .Lvram_buf+1
+1:
+	dey
+	bmi 1f
+	jmp .Lloop
+1:
+	jmp .Lnext_x
