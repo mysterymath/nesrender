@@ -61,8 +61,8 @@ int main() {
       uint8_t cur_render = get_frame_count();
       uint8_t fps = 60 / (cur_render - last_render);
       oam_set(1);
-      oam_spr(0, 0, fps / 10, 0);
-      oam_spr(8, 0, fps % 10, 0);
+      oam_spr(8, 8, fps / 10, 0);
+      oam_spr(16, 8, fps % 10, 0);
       if (overhead_view)
         overhead::render(*maps[cur_map_idx]);
       else
