@@ -91,22 +91,6 @@ present:
 	; x := color
 	tax
 
-	; Decrement cycles remaining
-	sec
-	lda .Lcycles_remaining
-	sbc #(2 + 4 + 2 + 4 + 2 + 4)
-	sta .Lcycles_remaining
-	lda .Lcycles_remaining+1
-	sbc #0
-	sta .Lcycles_remaining+1
-	bcs 1f
-
-	; Ran out of cycles; quit.
-	lda #1
-	sta still_presenting
-	jmp .Ldone
-
-1:
 	sty .Ly
 
 	lda .Lis_consec
@@ -114,6 +98,22 @@ present:
 	ldy #0
 	jmp .Lconsec
 .Lnon_consec:
+	; Decrement cycles remaining
+	sec
+	lda .Lcycles_remaining
+	sbc #(2 + 4 + 2 + 4)
+	sta .Lcycles_remaining
+	lda .Lcycles_remaining+1
+	sbc #0
+	sta .Lcycles_remaining+1
+	bcs 1f
+
+	; Quit if too few.
+	lda #1
+	sta still_presenting
+	jmp .Ldone
+1:
+
 	; vram = y * 32
 	tya
 	ldy #0
@@ -173,6 +173,22 @@ present:
 	sta .Lis_consec
 
 .Lconsec:
+	; Decrement cycles remaining
+	sec
+	lda .Lcycles_remaining
+	sbc #(2 + 4)
+	sta .Lcycles_remaining
+	lda .Lcycles_remaining+1
+	sbc #0
+	sta .Lcycles_remaining+1
+	bcs 1f
+
+	; Ran out of cycles; quit.
+	lda #1
+	sta still_presenting
+	jmp .Ldone
+1:
+
 	lda #$a9 ; lda #
 	sta (.Lvram_buf),y
 	iny
