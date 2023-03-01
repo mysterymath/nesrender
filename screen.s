@@ -7,8 +7,7 @@
 .Ly = __rc4
 .Lvram = __rc5 ; +1
 .Lcycles_remaining = __rc7 ; +1
-.Lis_consec = __rc9
-.zeropage .Lvram_buf, .Ly, .Lvram, .Lcycles_remaining, .Lis_consec
+.zeropage .Lvram_buf, .Ly, .Lvram, .Lcycles_remaining
 
 .Lmax_cycles = 1024 + 512 + 128 + 2 ; Empirically determined by not checking against fb_cur
 
@@ -41,21 +40,15 @@ present:
 	lda #>.Lmax_cycles
 	sta .Lcycles_remaining+1
 
-	lda #0
-	sta .Lis_consec
-
 	ldy #0
 .Lloop:
 	lda (present_next_col),y
 	cmp (present_cur_col),y
-	bne .Lsend_pixel
+	bne .Lnon_consec
 	iny
 	cpy #30
 	bne .Lloop
 .Lnext_x:
-	lda #0
-	sta .Lis_consec
-
 	clc
 	lda present_cur_col
 	adc #30
@@ -85,17 +78,12 @@ present:
 	iny
 	sty updating_vram
 	rts
-.Lsend_pixel:
+.Lnon_consec:
 	; x := color
 	tax
 
 	sty .Ly
 
-	lda .Lis_consec
-	beq .Lnon_consec
-	ldy #0
-	jmp .Lconsec
-.Lnon_consec:
 	; Decrement cycles remaining
 	sec
 	lda .Lcycles_remaining
@@ -167,9 +155,6 @@ present:
 	sta (.Lvram_buf),y
 	iny
 
-	lda #1
-	sta .Lis_consec
-
 .Lconsec:
 	; Decrement cycles remaining
 	sec
@@ -228,8 +213,6 @@ present:
 	ldy #0
 	jmp .Lconsec
 2:
-	ldx #0
-	stx .Lis_consec
 	iny
 	cpy #30
 	beq 1f
