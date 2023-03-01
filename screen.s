@@ -10,7 +10,7 @@
 .Lis_consec = __rc9
 .zeropage .Lvram_buf, .Ly, .Lvram, .Lcycles_remaining, .Lis_consec
 
-.Lmax_cycles = 1024 + 512 + 128 + 8 ; Empirically determined by not checking against fb_cur
+.Lmax_cycles = 1024 + 512 + 128 + 2 ; Empirically determined by not checking against fb_cur
 
 .text
 .globl present
@@ -49,8 +49,6 @@ present:
 	lda (present_next_col),y
 	cmp (present_cur_col),y
 	bne .Lsend_pixel
-	ldx #0
-	stx .Lis_consec
 	iny
 	cpy #30
 	bne .Lloop
@@ -218,6 +216,20 @@ present:
 	txa
 	sta (present_cur_col),y
 
+	iny
+	cpy #30
+	beq 1f
+	lda (present_next_col),y
+	cmp (present_cur_col),y
+	beq 2f
+	; x := color
+	tax
+	sty .Ly
+	ldy #0
+	jmp .Lconsec
+2:
+	ldx #0
+	stx .Lis_consec
 	iny
 	cpy #30
 	beq 1f
