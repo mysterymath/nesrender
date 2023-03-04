@@ -5,6 +5,8 @@
 
 #include "log.h"
 
+struct Sector;
+
 struct Player {
   uint32_t x = 500l * 256;
   uint32_t y = 500l * 256;
@@ -21,12 +23,11 @@ struct Player {
   void strafe_right();
   void fly_up();
   void fly_down();
+  void collide(const Sector &s);
 
   static constexpr Log lspeed = Log(false, 21139);
   static constexpr uint16_t ang_speed = 256;
 };
-
-struct Sector;
 
 struct Wall {
   uint16_t x, y; // Left

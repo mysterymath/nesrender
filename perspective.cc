@@ -96,15 +96,15 @@ static void update_coverage() {
 
 static void draw_sector() {
   const Wall *loop_begin = nullptr;
-  for (uint16_t j = 0; j < sector->num_walls; j++) {
-    wall = &sector->walls[j];
+  for (uint16_t i = 0; i < sector->num_walls; i++) {
+    wall = &sector->walls[i];
     if (wall->begin_loop) {
       loop_begin = wall;
       begin_loop();
     }
-    next_wall = (j + 1 == sector->num_walls || sector->walls[j + 1].begin_loop)
+    next_wall = (i + 1 == sector->num_walls || sector->walls[i + 1].begin_loop)
                     ? loop_begin
-                    : &sector->walls[j + 1];
+                    : &sector->walls[i + 1];
     draw_wall();
   }
 }
