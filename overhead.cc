@@ -26,16 +26,47 @@ constexpr Log scale_up_factor(false, -311);
 constexpr Log scale_down_factor(false, 281);
 
 static void setup_camera();
-static void move_to(uint16_t x, uint16_t y);
-static void draw_to(uint16_t x, uint16_t y);
+static void draw_sector();
+
+static const Sector *sector;
 
 void overhead::render(const Map &map) {
   clear_screen();
   setup_camera();
-  Sector &s = *map.player_sector;
+
+  const Sector *sectors[16] = {map.player_sector};
+  uint8_t num_visited = 0;
+  uint8_t num_seen = 1;
+
+  while (num_visited < num_seen) {
+    sector = sectors[num_visited++];
+    draw_sector();
+
+    for (uint16_t j = 0; j < sector->num_walls && num_seen < 16; j++) {
+      Wall &w = sector->walls[j];
+      if (!w.portal)
+        continue;
+      bool already_seen = false;
+      for (uint8_t k = 0; k < num_seen; k++) {
+        if (sectors[k] == w.portal) {
+          already_seen = true;
+          break;
+        }
+      }
+      if (already_seen)
+        continue;
+      sectors[num_seen++] = w.portal;
+    }
+  }
+}
+
+static void move_to(uint16_t x, uint16_t y);
+static void draw_to(uint16_t x, uint16_t y);
+
+static void draw_sector() {
   Wall *begin_loop = nullptr;
-  for (uint16_t j = 0; j < s.num_walls; j++) {
-    Wall &w = s.walls[j];
+  for (uint16_t j = 0; j < sector->num_walls; j++) {
+    Wall &w = sector->walls[j];
     if (w.begin_loop) {
       if (begin_loop)
         draw_to(begin_loop->x, begin_loop->y);
