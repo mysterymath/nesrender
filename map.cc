@@ -97,7 +97,7 @@ void Player::collide() {
     Log norm_sq =
         (lnx * lnx * Log::pow2(12) + lny * lny * Log::pow2(12)) / Log::pow2(12);
 
-    Log proj = -(Log(rel_x) * lnx + Log(rel_y) * lny) / norm_sq;
+    Log proj = -Log(Log(rel_x) * lnx + Log(rel_y) * lny) / norm_sq;
 
     // We want to compute dist = proj / ||n||, since that's the length of the
     // correction vector, which indicates whether or not collision should
