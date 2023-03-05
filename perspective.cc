@@ -49,7 +49,7 @@ void perspective::render(const Map &map) {
 
   setup_camera();
 
-  sector = map.player_sector;
+  sector = player.sector;
   sector_is_portal = false;
   draw_sector();
 

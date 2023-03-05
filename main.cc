@@ -136,6 +136,7 @@ static void update() {
       player.dz = 0;
     }
 #endif
+  player.collide();
 }
 
 extern "C" void __putchar(char c) { POKE(0x4018, c); }

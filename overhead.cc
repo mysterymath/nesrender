@@ -34,7 +34,7 @@ void overhead::render(const Map &map) {
   clear_screen();
   setup_camera();
 
-  const Sector *sectors[16] = {map.player_sector};
+  const Sector *sectors[16] = {player.sector};
   uint8_t num_visited = 0;
   uint8_t num_seen = 1;
 

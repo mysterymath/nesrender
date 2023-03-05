@@ -25,15 +25,16 @@ void Player::strafe_right() {
 void Player::fly_up() { z += lspeed; }
 void Player::fly_down() { z -= lspeed; }
 
-void Player::collide(const Sector &s) {
+void Player::collide() {
   const Wall *loop_begin = nullptr;
-  for (uint16_t i = 0; i < s.num_walls; i++) {
-    Wall *w = &s.walls[i];
+  for (uint16_t i = 0; i < sector->num_walls; i++) {
+    Wall *w = &sector->walls[i];
     if (w->begin_loop)
       loop_begin = w;
-    const Wall *next = (i + 1 == s.num_walls || s.walls[i + 1].begin_loop)
-                           ? loop_begin
-                           : &s.walls[i + 1];
+    const Wall *next =
+        (i + 1 == sector->num_walls || sector->walls[i + 1].begin_loop)
+            ? loop_begin
+            : &sector->walls[i + 1];
     // TODO: Quickly limit the number of walls we have to consider.
 
     // Each wall has a normal that faces towards the sector, perpendicular
@@ -118,4 +119,5 @@ void load_map(const Map &map) {
   player.y = (uint32_t)map.player_y << 8;
   player.z = (uint32_t)map.player_z << 8;
   player.ang = map.player_ang;
+  player.sector = map.player_sector;
 }

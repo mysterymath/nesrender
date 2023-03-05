@@ -15,6 +15,8 @@ struct Player {
 
   uint16_t dz = 0;
 
+  Sector *sector;
+
   void forward();
   void backward();
   void turn_left();
@@ -23,7 +25,7 @@ struct Player {
   void strafe_right();
   void fly_up();
   void fly_down();
-  void collide(const Sector &s);
+  void collide();
 
   static constexpr Log lspeed = Log(false, 21139);
   static constexpr uint16_t ang_speed = 256;
