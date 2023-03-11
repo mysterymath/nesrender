@@ -77,18 +77,24 @@ void Player::collide() {
 
     // From here, the pushback vector is just the inverse of the vector
     // projection onto the unit normal.
-    // proj_norm = rel . n
-    // proj = proj_norm n
-    int16_t proj_norm = rel_x * w->nx + rel_y * w->ny;
-    printf("proj_norm: %d\n", proj_norm);
+    // pushback_scale = rel . n
+    // pushback = pushback_scale n
+    int16_t pushback_scale = rel_x * -w->nx - rel_y * w->ny;
+    printf("pushback_scale: %d\n", pushback_scale);
 
+    // If the pushback is towards the wall (away from the normal), then the
+    // player didn't collide with the wall.
+    if (pushback_scale < 0)
+      //continue;
+      return;
+
+    int16_t pushback_x = pushback_scale * w->nx;
+    int16_t pushback_y = pushback_scale * w->ny;
+    printf("pushback: %d %d\n", pushback_x, pushback_y);
+
+    player.x += pushback_x;
+    player.y += pushback_y;
 #if 0
-    Log proj = -Log(Log(rel_x) * lnx + Log(rel_y) * lny) / norm_sq;
-
-    printf("proj: %d %d\n", proj.sign, proj.exp);
-
-    Log dist_sq = proj * proj / norm_sq;
-
     // We want to compute dist = proj / ||n||, since that's the length of the
     // correction vector, which indicates whether or not collision should
     // trigger. But computing ||n|| requires a square root.  Instead, we can
@@ -100,8 +106,6 @@ void Player::collide() {
       //continue;
       return;
 
-    player.x += proj * lnx;
-    player.y += proj * lny;
   //}
 #endif
 }
