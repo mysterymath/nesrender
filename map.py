@@ -1,7 +1,9 @@
-from collections import namedtuple
-from pathlib import Path
+import math
 import struct
 import sys
+
+from collections import namedtuple
+from pathlib import Path
 
 map_path = Path(sys.argv[1])
 
@@ -89,6 +91,21 @@ def transform_ang(ang):
     return 0
   return 65536 - ang * 2**5 # / 2^11 * 2^16 * -1
 
+def normal(dx, dy):
+  # [ cos -90 -sin -90 ] [ dx ]
+  # [ sin -90  cos -90 ] [ dy ]
+  # [  0 1 ] [ dx ]
+  # [ -1 0 ] [ dy ]
+  nx = dy
+  ny = -dx
+  norm = math.sqrt(nx**2 + ny**2)
+  nx /= norm
+  ny /= norm
+  lnx_sign = 1 if nx < 0 else 0
+  lnx_exp = round(math.log2(abs(nx)) * 2048) if nx else -32768
+  lny_sign = 1 if ny < 0 else 0
+  lny_exp = round(math.log2(abs(ny)) * 2048) if ny else -32768
+  return f'Log({lnx_sign}, {lnx_exp}), Log({lny_sign}, {lny_exp})'
 
 print('#include "map.h"\n')
 
@@ -104,7 +121,9 @@ for i, w in enumerate(walls):
   if w.point2 == chain_begin:
     chain_begin = i+1
   portal = f'&sectors[{w.nextsector}]' if w.nextsector != -1 else 'nullptr'
-  print(f'  {{{x}, {y}, {begins_chain}, {w.picnum}, {portal}}},')
+  next_x = transform_x(walls[w.point2].x)
+  next_y = transform_y(walls[w.point2].y)
+  print(f'  {{{x}, {y}, {normal(next_x - x, next_y - y)}, {begins_chain}, {w.picnum}, {portal}}},')
 print('};\n');
 
 print('Sector sectors[] = {')

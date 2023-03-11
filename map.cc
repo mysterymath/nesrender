@@ -65,59 +65,9 @@ void Player::collide() {
     // We can consider a function for each wall that, given the player's
     // position, produces the pushback vector.
 
-    // Start by producing a non-unit normal vector, n.
-    // We get n by applying a -90 deg CCW rotation matrix to (dx, dy):
-    int16_t dx = next->x - w->x;
-    int16_t dy = next->y - w->y;
-    // [ cos -90 -sin -90 ] [ dx ]
-    // [ sin -90  cos -90 ] [ dy ]
-    // [  0 1 ] [ dx ]
-    // [ -1 0 ] [ dy ]
-    int16_t nx = dy;
-    int16_t ny = -dx;
-    printf("D: %d %d\n", dx, dy);
-    printf("N: %d %d\n", nx, ny);
+    printf("lnx, lny: %d %d %d %d\n", w->nx.sign, w->nx.exp, w->ny.sign, w->ny.exp);
 
-    // Now, we'd like the pushback function to be linear. It must thus be zero
-    // at the origin, so set the origin one player's width along the normal
-    // vector.
-
-    int16_t rel_x = px - w->x;
-    int16_t rel_y = py - w->y;
-
-    printf("Rel: %d %d\n", rel_x, rel_y);
-
-    // Our pushback is then just the inverse of the projection of the player's
-    // position onto the unit normal: (p . un) -un
-    //
-    // TODO: Precompute the unit normals?
-    //
-    // We can avoid needing to compute a sqrt by using a non-unit normal; the
-    // equation then becomes:
-    //
-    // -((p . n) / (n . n))n
-
-
-    // We can simulate a unit normal numerically without square root by scaling
-    // onto the box -1, 1.
-    Log lnx = nx;
-    Log lny = ny;
-    if (lnx.abs() >= lny.abs()) {
-      lny /= lnx.abs();
-      lnx /= lnx.abs();
-    } else {
-      lnx /= lny.abs();
-      lny /= lny.abs();
-    }
-
-    printf("lnx, lny: %d %d %d %d\n", lnx.sign, lnx.exp, lny.sign, lny.exp);
-
-    // The norm squared then ranges from 1 to 2.
-    Log norm_sq =
-        (lnx * lnx * Log::pow2(12) + lny * lny * Log::pow2(12)) / Log::pow2(12);
-
-    printf("norm_sq: %d %d\n", norm_sq.sign, norm_sq.exp);
-
+#if 0
     Log proj = -Log(Log(rel_x) * lnx + Log(rel_y) * lny) / norm_sq;
 
     printf("proj: %d %d\n", proj.sign, proj.exp);
@@ -138,6 +88,7 @@ void Player::collide() {
     player.x += proj * lnx;
     player.y += proj * lny;
   //}
+#endif
 }
 
 void load_map(const Map &map) {

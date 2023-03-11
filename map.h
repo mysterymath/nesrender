@@ -33,6 +33,7 @@ struct Player {
 
 struct Wall {
   uint16_t x, y; // Left
+  Log nx, ny;    // Unit normal
   bool begin_loop;
   uint8_t color;
   Sector *portal;
