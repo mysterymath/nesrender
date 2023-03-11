@@ -67,6 +67,21 @@ void Player::collide() {
 
     printf("lnx, lny: %d %d %d %d\n", w->nx.sign, w->nx.exp, w->ny.sign, w->ny.exp);
 
+    // We'd like the pushback function to be linear; that means it must be zero
+    // at the origin. To achieve this, set the origin to one player's width from
+    // the wall's starting coordingate in the direction of the unit normal.
+    Log player_width = Log(30);
+    int16_t rel_x = px - (w->x + w->nx * player_width);
+    int16_t rel_y = py - (w->y + w->ny * player_width);
+    printf("rel: %d %d\n", rel_x, rel_y);
+
+    // From here, the pushback vector is just the inverse of the vector
+    // projection onto the unit normal.
+    // proj_norm = rel . n
+    // proj = proj_norm n
+    int16_t proj_norm = rel_x * w->nx + rel_y * w->ny;
+    printf("proj_norm: %d\n", proj_norm);
+
 #if 0
     Log proj = -Log(Log(rel_x) * lnx + Log(rel_y) * lny) / norm_sq;
 
