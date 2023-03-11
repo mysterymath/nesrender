@@ -42,10 +42,10 @@ void Player::collide() {
             ? loop_begin
             : &sector->walls[i + 1];
 
-    printf("Player: %d %d\n", px, py);
-    printf("Wall: %d %d -> %d %d\n", w->x, w->y, next->x, next->y);
-
     // TODO: Quickly limit the number of walls we have to consider.
+
+    // TODO: This makes each wall infinitely long! Need to have zero pushback
+    // outside the wall segment.
 
     // Each wall has a normal that faces towards the sector, perpendicular
     // to the wall.
@@ -65,22 +65,18 @@ void Player::collide() {
     // We can consider a function for each wall that, given the player's
     // position, produces the pushback vector.
 
-    printf("lnx, lny: %d %d %d %d\n", w->nx.sign, w->nx.exp, w->ny.sign, w->ny.exp);
-
     // We'd like the pushback function to be linear; that means it must be zero
     // at the origin. To achieve this, set the origin to one player's width from
     // the wall's starting coordingate in the direction of the unit normal.
-    Log player_width = Log(30);
+    Log player_width = Log(64);
     int16_t rel_x = px - (w->x + w->nx * player_width);
     int16_t rel_y = py - (w->y + w->ny * player_width);
-    printf("rel: %d %d\n", rel_x, rel_y);
 
     // From here, the pushback vector is just the inverse of the vector
     // projection onto the unit normal.
     // pushback_scale = rel . n
     // pushback = pushback_scale n
     int16_t pushback_scale = rel_x * -w->nx - rel_y * w->ny;
-    printf("pushback_scale: %d\n", pushback_scale);
 
     // If the pushback is towards the wall (away from the normal), then the
     // player didn't collide with the wall.
@@ -90,10 +86,9 @@ void Player::collide() {
 
     int16_t pushback_x = pushback_scale * w->nx;
     int16_t pushback_y = pushback_scale * w->ny;
-    printf("pushback: %d %d\n", pushback_x, pushback_y);
 
-    player.x += pushback_x;
-    player.y += pushback_y;
+    player.x += pushback_x * 256;
+    player.y += pushback_y * 256;
 #if 0
     // We want to compute dist = proj / ||n||, since that's the length of the
     // correction vector, which indicates whether or not collision should
