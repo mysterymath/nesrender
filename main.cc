@@ -51,15 +51,13 @@ int main() {
 
   load_map(*maps[0]);
   uint8_t last_update = get_frame_count();
-  uint8_t last_render = get_frame_count();
   uint8_t last_present = get_frame_count();
   while (true) {
-    uint8_t cur_update = get_frame_count();
-    for (; last_update != cur_update; ++last_update)
-      update();
     if (!still_presenting) {
-      uint8_t cur_render = get_frame_count();
-      uint8_t fps = 60 / (cur_render - last_render);
+      uint8_t cur_update = get_frame_count();
+      uint8_t fps = 60 / (cur_update - last_update);
+      for (; last_update != cur_update; ++last_update)
+        update();
       oam_set(1);
       oam_spr(8, 8, fps / 10, 0);
       oam_spr(16, 8, fps % 10, 0);
@@ -67,7 +65,6 @@ int main() {
         overhead::render(*maps[cur_map_idx]);
       else
         perspective::render(*maps[cur_map_idx]);
-      last_render = cur_render;
     }
     idle(last_present);
     present();
