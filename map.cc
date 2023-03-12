@@ -32,8 +32,7 @@ void Player::collide() {
   int16_t py = player.y / 256;
 
   const Wall *loop_begin = nullptr;
-  //for (uint16_t i = 0; i < sector->num_walls; i++) {
-  uint16_t i = 0;
+  for (uint16_t i = 0; i < sector->num_walls; i++) {
     Wall *w = &sector->walls[i];
     if (w->begin_loop)
       loop_begin = w;
@@ -78,30 +77,37 @@ void Player::collide() {
     // If the pushback is towards the wall (away from the normal), then the
     // player didn't collide with the wall.
     if (pushback_scale < 0)
-      return;
+      continue;
 
     // Reaching here means that the player is in the half-space on the other
     // side of the wall, but the player may still be to the left or right of the
-    // wall's hitbox. In the translated coordinates, the left hitbox is r(t) = nt.
-    // The player is to the left of it iff rel_x < nx * t, where rel_y = ny * t.
-    // That is, rel_x < nx * rel_y / ny
-    if (rel_x < w->nx * Log(rel_y) / w->ny)
-      return;
+    // wall's hitbox. Projecting onto the wall's direction gives an indicator
+    // for the left hitbox. The wall's direction is given by rotating the normal
+    // 90 degrees CCW.
+    // [ cos 90 -sin 90 ] [ nx ]
+    // [ sin 90  cos 90 ] [ ny ]
+    //
+    // [ 0 -1 ] [ nx ]
+    // [ 1  0 ] [ ny ]
+    Log dx = -w->ny;
+    Log dy = w->nx;
+    if (rel_x * dx + rel_y * dy < 0)
+      continue;
 
     // Similarly, shift the origin over to the right side of the hitbox, and the
     // same relation holds.
     rel_x -= next->x - w->x;
     rel_y -= next->y - w->y;
 
-    if (rel_x > w->nx * Log(rel_y) / w->ny)
-      return;
+    if (rel_x * dx + rel_y * dy > 0)
+      continue;
 
     int16_t pushback_x = pushback_scale * w->nx;
     int16_t pushback_y = pushback_scale * w->ny;
 
     player.x += pushback_x * 256;
     player.y += pushback_y * 256;
-  //}
+  }
 }
 
 void load_map(const Map &map) {
