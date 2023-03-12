@@ -44,9 +44,6 @@ void Player::collide() {
 
     // TODO: Quickly limit the number of walls we have to consider.
 
-    // TODO: This makes each wall infinitely long! Need to have zero pushback
-    // outside the wall segment.
-
     // Each wall has a normal that faces towards the sector, perpendicular
     // to the wall.
     //
@@ -81,7 +78,22 @@ void Player::collide() {
     // If the pushback is towards the wall (away from the normal), then the
     // player didn't collide with the wall.
     if (pushback_scale < 0)
-      //continue;
+      return;
+
+    // Reaching here means that the player is in the half-space on the other
+    // side of the wall, but the player may still be to the left or right of the
+    // wall's hitbox. In the translated coordinates, the left hitbox is r(t) = nt.
+    // The player is to the left of it iff rel_x < nx * t, where rel_y = ny * t.
+    // That is, rel_x < nx * rel_y / ny
+    if (rel_x < w->nx * Log(rel_y) / w->ny)
+      return;
+
+    // Similarly, shift the origin over to the right side of the hitbox, and the
+    // same relation holds.
+    rel_x -= next->x - w->x;
+    rel_y -= next->y - w->y;
+
+    if (rel_x > w->nx * Log(rel_y) / w->ny)
       return;
 
     int16_t pushback_x = pushback_scale * w->nx;
@@ -89,20 +101,7 @@ void Player::collide() {
 
     player.x += pushback_x * 256;
     player.y += pushback_y * 256;
-#if 0
-    // We want to compute dist = proj / ||n||, since that's the length of the
-    // correction vector, which indicates whether or not collision should
-    // trigger. But computing ||n|| requires a square root.  Instead, we can
-    // square both sides and compute proj^2 / norm_sq.
-    //
-    // TODO: This is only in range if proj < 256
-    Log player_width = Log(30);
-    if (proj.sign || proj * proj / norm_sq > player_width * player_width)
-      //continue;
-      return;
-
   //}
-#endif
 }
 
 void load_map(const Map &map) {
