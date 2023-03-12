@@ -32,6 +32,7 @@ void Player::collide() {
   int16_t py = player.y / 256;
 
   const Wall *loop_begin = nullptr;
+  constexpr Log player_width = Log::pow2(6);
   for (uint16_t i = 0; i < sector->num_walls; i++) {
     Wall *w = &sector->walls[i];
     if (w->begin_loop)
@@ -64,19 +65,20 @@ void Player::collide() {
     // We'd like the pushback function to be linear; that means it must be zero
     // at the origin. To achieve this, set the origin to one player's width from
     // the wall's starting coordingate in the direction of the unit normal.
-    Log player_width = Log(64);
     int16_t rel_x = px - (w->x + w->nx * player_width);
     int16_t rel_y = py - (w->y + w->ny * player_width);
+    Log lrx = rel_x;
+    Log lry = rel_y;
 
     // From here, the pushback vector is just the inverse of the vector
     // projection onto the unit normal.
     // pushback_scale = rel . n
     // pushback = pushback_scale n
-    int16_t pushback_scale = rel_x * -w->nx - rel_y * w->ny;
+    Log pushback_scale = lrx * -w->nx - lry * w->ny;
 
     // If the pushback is towards the wall (away from the normal), then the
     // player didn't collide with the wall.
-    if (pushback_scale < 0)
+    if (pushback_scale.sign)
       continue;
 
     // Reaching here means that the player is in the half-space on the other
@@ -91,7 +93,7 @@ void Player::collide() {
     // [ 1  0 ] [ ny ]
     Log dx = -w->ny;
     Log dy = w->nx;
-    if (rel_x * dx + rel_y * dy < 0)
+    if (lrx * dx + lry * dy < 0)
       continue;
 
     // Similarly, shift the origin over to the right side of the hitbox, and the
@@ -99,7 +101,7 @@ void Player::collide() {
     rel_x -= next->x - w->x;
     rel_y -= next->y - w->y;
 
-    if (rel_x * dx + rel_y * dy > 0)
+    if (Log(rel_x) * dx + Log(rel_y) * dy > 0)
       continue;
 
     int16_t pushback_x = pushback_scale * w->nx;
