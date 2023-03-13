@@ -30,7 +30,7 @@ static uint8_t cur_map_idx = 0;
 static bool overhead_view = false;
 
 static void update();
-static void idle(uint8_t last_present);
+static void wait_to_present();
 
 int main() {
   static const uint8_t bg_pal[16] = {0x0f, 0x06, 0x16, 0x0c};
@@ -51,7 +51,6 @@ int main() {
 
   load_map(*maps[0]);
   uint8_t last_update = get_frame_count();
-  uint8_t last_present = get_frame_count();
   while (true) {
     if (!still_presenting) {
       uint8_t cur_update = get_frame_count();
@@ -66,14 +65,13 @@ int main() {
       else
         perspective::render(*maps[cur_map_idx]);
     }
-    idle(last_present);
+    wait_to_present();
     present();
-    last_present = get_frame_count();
   }
 }
 
-static void idle(uint8_t last_present) {
-  while (get_frame_count() == last_present)
+static void wait_to_present() {
+  while (updating_vram)
     ;
 }
 

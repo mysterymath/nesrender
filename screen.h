@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 extern bool still_presenting;
+extern volatile bool updating_vram;
 extern uint8_t fb_cur[960];
 extern uint8_t fb_next[960];
 
