@@ -59,8 +59,10 @@ int main() {
                                          : cur_update - last_update);
 
       // Handle wraparound if any.
-      for (; cur_update < last_update; last_update += 3)
-        update();
+      if (cur_update < last_update) {
+        while (!__builtin_add_overflow(last_update, 3, &last_update))
+          ;
+      }
       for (; last_update < cur_update; last_update += 3)
         update();
       oam_set(1);
