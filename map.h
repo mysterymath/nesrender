@@ -27,8 +27,8 @@ struct Player {
   void fly_down();
   void collide();
 
-  static constexpr Log lspeed = Log(false, 21139);
-  static constexpr uint16_t ang_speed = 256;
+  static constexpr Log lspeed = Log(false, 24385);
+  static constexpr uint16_t ang_speed = 768;
 };
 
 struct Wall {

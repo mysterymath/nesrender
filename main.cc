@@ -54,8 +54,14 @@ int main() {
   while (true) {
     if (!still_presenting) {
       uint8_t cur_update = get_frame_count();
-      uint8_t fps = 60 / (cur_update - last_update);
-      for (; last_update != cur_update; ++last_update)
+      uint8_t fps =
+          60 / (cur_update < last_update ? cur_update + 256 - last_update
+                                         : cur_update - last_update);
+
+      // Handle wraparound if any.
+      for (; cur_update < last_update; last_update += 3)
+        update();
+      for (; last_update < cur_update; last_update += 3)
         update();
       oam_set(1);
       oam_spr(8, 8, fps / 10, 0);
