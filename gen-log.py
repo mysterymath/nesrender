@@ -7,8 +7,7 @@ def lohi(table):
 logt = [round(np.mean([math.log2(x + 0x100 + y / 256) * 2**11 for y in range(256)])) for x in range(256)]
 logt_lo, logt_hi = lohi(logt)
 
-# Note that this table would normally range from [1,2). Multiply by 2**15 for range [2**15, 2**16].
-alogt = [round(np.mean([2**(x / 2**8 + y / 2**16) * 2**15 for y in range(256)])) for x in range(256)]
+alogt = [min(round(np.mean([2**((hi * 256 + lo) / 2 / 2048) for lo in range(256)])), 32767) for hi in range(256)]
 alogt_lo, alogt_hi = lohi(alogt)
 
 print('#include <stdint.h>')

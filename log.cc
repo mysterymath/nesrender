@@ -53,22 +53,14 @@ Log::operator int16_t() const {
   if (exp >= 15 * 2048)
     return sign ? -32768 : 32767;
 
-  // Shift the exponent so the whole/frac boundary is along the byte.
-  uint16_t split = exp;
-  split >>= 3;
-  uint8_t whole = split >> 8;
-  uint8_t frac = split & 0xff;
+  bool shift_8 = exp & 0x8000;
+  uint8_t idx = (exp << 1) >> 8;
 
-  // Produce the unsigned result, but shifted up by 15.
-  uint16_t uresult = alogt_lo[frac] | alogt_hi[frac] << 8;
-
-  // Shift the result back to produce the final unsigned result.
-  uint8_t shift = 15 - whole;
-  if (shift >= 8) {
-    shift -= 8;
-    uresult >>= 8;
-  }
-  uresult >>= shift;
+  uint16_t uresult = alogt_lo[idx];
+  if (shift_8)
+    uresult <<= 8;
+  else
+    uresult |= alogt_hi[idx] << 8;
 
   return sign ? -uresult : uresult;
 #else

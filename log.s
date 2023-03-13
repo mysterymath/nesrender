@@ -111,72 +111,31 @@ log_to_lin:
 	rts
 
 .Lexp_positive:
-	; (2^15)
-	cpx #$78
-	bmi .Lexp_in_range
-	lda __rc2
-	bne 1f
-	lda #$ff
-	ldx #$7f
-	rts
-1:
-	lda #0
-	ldx #$80
-	rts
-
-.Lexp_in_range:
 	sta __rc3
 	txa
-	lsr
-	ror __rc3
-	lsr
-	ror __rc3
-	lsr
-	ror __rc3
-
-	sta __rc4
-	ldx __rc3
+	asl __rc3
+	rol
+	tax
 	lda alogt_lo,x
-	sta __rc5
+	bcs .Lshift8
+	tay
 	lda alogt_hi,x
-	sta __rc6
-
-	lda #15
-	sec
-	sbc __rc4
-	sbc #8
-	bcc .Lshift_lt_8
 	tax
-	lda __rc6
-	cpx #0
-	beq .Lshift_8_done
-.Lshift_8:
-	lsr
-	dex
-	bne .Lshift_8
-.Lshift_8_done:
-	stx __rc6
-	beq .Ldone
-.Lshift_lt_8:
-	adc #8
+	tya
+	jmp .Ldone
+.Lshift8:
 	tax
-	lda __rc5
-.Lshift_16:
-	lsr __rc6
-	ror
-	dex
-	bne .Lshift_16
+	lda #0
 .Ldone:
 	ldy __rc2
 	bne 1f
-	ldx __rc6
 	rts
 1:
 	clc
 	eor #$ff
 	adc #1
 	tay
-	lda __rc6
+	txa
 	eor #$ff
 	adc #0
 	tax
