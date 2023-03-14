@@ -32,7 +32,8 @@ void Player::collide() {
   int16_t py = player.y / 256;
 
   const Wall *loop_begin = nullptr;
-  constexpr Log player_width = Log::pow2(6);
+  constexpr int16_t player_width = 64;
+  constexpr Log lplayer_width = Log::pow2(6);
   for (uint16_t i = 0; i < sector->num_walls; i++) {
     Wall *w = &sector->walls[i];
     if (w->begin_loop)
@@ -42,7 +43,20 @@ void Player::collide() {
             ? loop_begin
             : &sector->walls[i + 1];
 
-    // TODO: Quickly limit the number of walls we have to consider.
+    // Do a quick series of AABB tests to see if the player is definitely
+    // outside the wall's hitbox.
+    if (w->nx.sign && (w->x < next->x ? px < w->x - player_width
+                                      : px < next->x - player_width))
+      continue;
+    if (!w->nx.sign && (w->x > next->x ? px > w->x + player_width
+                                       : px > next->x + player_width))
+      continue;
+    if (w->ny.sign && (w->y < next->y ? py < w->y - player_width
+                                      : py < next->y - player_width))
+      continue;
+    if (!w->ny.sign && (w->y > next->y ? py > w->y + player_width
+                                       : py > next->y + player_width))
+      continue;
 
     // Each wall has a normal that faces towards the sector, perpendicular
     // to the wall.
@@ -65,8 +79,8 @@ void Player::collide() {
     // We'd like the pushback function to be linear; that means it must be zero
     // at the origin. To achieve this, set the origin to one player's width from
     // the wall's starting coordingate in the direction of the unit normal.
-    int16_t rel_x = px - (w->x + w->nx * player_width);
-    int16_t rel_y = py - (w->y + w->ny * player_width);
+    int16_t rel_x = px - (w->x + w->nx * lplayer_width);
+    int16_t rel_y = py - (w->y + w->ny * lplayer_width);
     Log lrx = rel_x;
     Log lry = rel_y;
 
