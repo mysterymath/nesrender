@@ -35,7 +35,7 @@ constexpr u16 mmc1_ctrl = 0x8000;
 constexpr u16 bg_pals = 0x3f00;
 
 constexpr u8 frame_buffer_stride = 2+3; // LDA imm, STA abs
-extern u8 frame_buffer[frame_buffer_stride * 960 + 1];
+extern u8 frame_buffer[frame_buffer_stride * 24 * 32 + 1];
 
 static void init_framebuffer() {
   u16 tile = 0;
@@ -53,8 +53,16 @@ static void init_framebuffer() {
   frame_buffer[sizeof(frame_buffer) - 1] = rts; // RTS
 }
 
+// Fill the hud w/ a nice checkerboard pattern.
+static void init_hud() {
+  ppu_set_addr(0x2000 + 24*32);
+  for (u16 i = 24*32; i < 30*32; i++)
+    PPU.vram.data = 86;
+}
+
 int main() {
   init_framebuffer();
+  init_hud();
 
   static const uint8_t bg_pal[16] = {0x0f, 0x06, 0x16, 0x0c};
   mmc1_register_write(mmc1_ctrl, 0b01100);
