@@ -35,7 +35,7 @@ constexpr u16 mmc1_ctrl = 0x8000;
 constexpr u16 bg_pals = 0x3f00;
 
 constexpr u8 frame_buffer_stride = 2+3; // LDA imm, STA abs
-extern u8 frame_buffer[frame_buffer_stride * 24 * 32 + 1];
+extern volatile u8 frame_buffer[frame_buffer_stride * 24 * 32 + 1];
 
 static void init_framebuffer() {
   u16 tile = 0;
@@ -60,6 +60,11 @@ static void init_hud() {
     PPU.vram.data = 86;
 }
 
+[[clang::noinline]] static void cycle_tiles() {
+  for (u16 idx = 1; idx < sizeof(frame_buffer); idx += 5)
+    frame_buffer[idx] ^= frame_buffer[idx+5];
+}
+
 int main() {
   init_framebuffer();
   init_hud();
@@ -75,5 +80,5 @@ int main() {
   PPU.mask = 0b0001110;
 
   while (true)
-    c = 0;
+    cycle_tiles();
 }
