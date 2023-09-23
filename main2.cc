@@ -38,7 +38,6 @@ constexpr u8 frame_buffer_stride = 2+3; // LDA imm, STA abs
 extern u8 frame_buffer[frame_buffer_stride * 960 + 1];
 
 static void init_framebuffer() {
-
   u16 tile = 0;
   for (u16 i = 0; i < sizeof(frame_buffer);) {
     static constexpr u8 lda_imm = 0xa9;
@@ -63,6 +62,9 @@ int main() {
   ppu_set_addr(bg_pals);
   for (u16 i = 0; i < sizeof(bg_pal); i++)
     PPU.vram.data = bg_pal[i];
+
+  PPU.control = 0b10001000;
+  PPU.mask = 0b0001110;
 
   while (true)
     c = 0;
