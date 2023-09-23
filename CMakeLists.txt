@@ -37,4 +37,10 @@ target_link_options(render PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld)
 set_property(SOURCE chr.s PROPERTY
 	OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sprites.chr ${CMAKE_CURRENT_SOURCE_DIR}/pixels.chr)
 
-add_executable(render2 main2.cc)
+add_executable(render2
+  chr.s
+  frame-buffer.s
+  main2.cc
+)
+target_include_directories(render2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_options(render2 PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld)
