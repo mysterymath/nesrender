@@ -32,7 +32,7 @@ frame_buffer:
   sta PPUADDR
 
   ; Empirically add NOPs until it doesn't glitch 
-  .rept 25
+  .rept 27
   nop
   .endr
 

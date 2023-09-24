@@ -37,6 +37,16 @@ constexpr u16 bg_pals = 0x3f00;
 constexpr u8 frame_buffer_stride = 2+3; // LDA imm, STA abs
 extern volatile u8 frame_buffer[frame_buffer_stride * 24 * 32 + 1];
 
+/* 16-bit xorshift PRNG */
+unsigned xorshift( )
+{
+  static unsigned x = 1;
+    x ^= x << 7;
+    x ^= x >> 9;
+    x ^= x << 8;
+    return x;
+}
+
 static void init_framebuffer() {
   u16 tile = 0;
   for (u16 i = 0; i < sizeof(frame_buffer);) {
@@ -53,21 +63,25 @@ static void init_framebuffer() {
   frame_buffer[sizeof(frame_buffer) - 1] = rts; // RTS
 }
 
-// Fill the hud w/ a nice checkerboard pattern.
-static void init_hud() {
+// Fill the hud w/ a nice checkerboard pattern and zero the attribute table.
+static void init_nametable_remainder() {
   ppu_set_addr(0x2000 + 24*32);
-  for (u16 i = 24*32; i < 30*32; i++)
+  u16 i;
+  for (i = 24*32; i < 30*32; i++)
     PPU.vram.data = 86;
+  // Zero the attribute table.
+  for (; i < 1024; i++)
+    PPU.vram.data = 0;
 }
 
-[[clang::noinline]] static void cycle_tiles() {
+[[clang::noinline]] static void randomize_tiles() {
   for (u16 idx = 1; idx < sizeof(frame_buffer); idx += 5)
-    frame_buffer[idx] ^= frame_buffer[idx+5];
+    frame_buffer[idx] = xorshift();
 }
 
 int main() {
   init_framebuffer();
-  init_hud();
+  init_nametable_remainder();
 
   static const uint8_t bg_pal[16] = {0x0f, 0x06, 0x16, 0x0c};
   mmc1_register_write(mmc1_ctrl, 0b01100);
@@ -80,5 +94,5 @@ int main() {
   PPU.mask = 0b0001110;
 
   while (true)
-    cycle_tiles();
+    randomize_tiles();
 }
