@@ -45,17 +45,20 @@ volatile uint8_t c;
 
 constexpr u16 mmc1_ctrl = 0x8000;
 
-constexpr u8 frame_buffer_stride = 2+3; // LDA imm, STA abs
-extern volatile u8 frame_buffer[frame_buffer_stride * 24 * 32 + 1];
+constexpr u8 fb_height_tiles = 21;
+constexpr u8 fb_width_tiles = 32;
+
+constexpr u8 frame_buffer_stride = 2 + 3; // LDA imm, STA abs
+extern volatile u8
+    frame_buffer[frame_buffer_stride * fb_height_tiles * fb_width_tiles + 1];
 
 /* 16-bit xorshift PRNG */
-unsigned xorshift( )
-{
+unsigned xorshift() {
   static unsigned x = 1;
-    x ^= x << 7;
-    x ^= x >> 9;
-    x ^= x << 8;
-    return x;
+  x ^= x << 7;
+  x ^= x >> 9;
+  x ^= x << 8;
+  return x;
 }
 
 static void init_framebuffer() {
@@ -76,9 +79,9 @@ static void init_framebuffer() {
 
 // Fill the hud w/ a nice checkerboard pattern and zero the attribute table.
 static void init_nametable_remainder() {
-  ppu_set_addr(0x2000 + 24*32);
+  ppu_set_addr(0x2000 + fb_height_tiles * fb_width_tiles);
   u16 i;
-  for (i = 24*32; i < 30*32; i++)
+  for (i = fb_height_tiles * fb_width_tiles; i < 30 * 32; i++)
     PPU.vram.data = 86;
   // Zero the attribute table.
   for (; i < 1024; i++)
