@@ -13,6 +13,10 @@ frame_buffer:
   ; Disable rendering; we need slightly more than one vblank.
   lda #0
   sta PPUMASK
+
+  ; Run OAMDMA
+  lda #>oam_buf
+  sta OAMDMA
   
   ; Run the framebuffer copy routine.
   lda #>$2000

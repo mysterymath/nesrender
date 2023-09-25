@@ -39,8 +39,8 @@ set_property(SOURCE chr.s PROPERTY
 
 add_executable(render2
   chr.s
-  frame-buffer.s
   main2.cc
+  nmi.s
 )
 target_include_directories(render2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_options(render2 PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld)

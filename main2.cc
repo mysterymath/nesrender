@@ -10,6 +10,18 @@ MAPPER_PRG_RAM_KB(8);
 typedef uint16_t u16;
 typedef uint8_t u8;
 
+constexpr u16 ppu_bg_pals = 0x3f00;
+constexpr u16 ppu_spr_pals = 0x3f11;
+
+struct oam {
+  u8 y;
+  u8 tile;
+  u8 attrs;
+  u8 x;
+};
+
+alignas(256) oam oam_buf[64];
+
 __attribute__((always_inline)) static inline void mmc1_register_write(u16 addr,
                                                                       u8 val) {
   POKE(addr, val);
@@ -32,7 +44,6 @@ static void ppu_set_addr(u16 addr) {
 volatile uint8_t c;
 
 constexpr u16 mmc1_ctrl = 0x8000;
-constexpr u16 bg_pals = 0x3f00;
 
 constexpr u8 frame_buffer_stride = 2+3; // LDA imm, STA abs
 extern volatile u8 frame_buffer[frame_buffer_stride * 24 * 32 + 1];
@@ -83,12 +94,18 @@ int main() {
   init_framebuffer();
   init_nametable_remainder();
 
-  static const uint8_t bg_pal[16] = {0x0f, 0x06, 0x16, 0x0c};
   mmc1_register_write(mmc1_ctrl, 0b01100);
   PPU.control = 0b00001000;
-  ppu_set_addr(bg_pals);
-  for (u16 i = 0; i < sizeof(bg_pal); i++)
-    PPU.vram.data = bg_pal[i];
+
+  ppu_set_addr(ppu_bg_pals);
+  static const uint8_t bg_pals[16] = {0x0f, 0x06, 0x16, 0x0c};
+  for (u16 i = 0; i < sizeof(bg_pals); i++)
+    PPU.vram.data = bg_pals[i];
+
+  ppu_set_addr(ppu_spr_pals);
+  static const uint8_t spr_pals[15] = {0x00, 0x10, 0x30};
+  for (u16 i = 0; i < sizeof(spr_pals); i++)
+    PPU.vram.data = spr_pals[i];
 
   PPU.control = 0b10001000;
   PPU.mask = 0b0001110;
