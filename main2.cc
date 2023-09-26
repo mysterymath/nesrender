@@ -45,7 +45,7 @@ volatile uint8_t c;
 
 constexpr u16 mmc1_ctrl = 0x8000;
 
-constexpr u8 fb_height_tiles = 22;
+constexpr u8 fb_height_tiles = 21;
 constexpr u8 fb_width_tiles = 32;
 
 constexpr u8 frame_buffer_stride = 2 + 3; // LDA imm, STA abs
@@ -59,6 +59,13 @@ unsigned xorshift() {
   x ^= x >> 9;
   x ^= x << 8;
   return x;
+}
+
+// The first row is corrupted, so black it out.
+static void init_first_row() {
+  ppu_set_addr(0x2000);
+  for (u8 i = 0; i < fb_width_tiles; i++)
+    PPU.vram.data = 0;
 }
 
 static void init_framebuffer() {
@@ -93,6 +100,13 @@ static void init_nametable_remainder() {
     frame_buffer[idx] = xorshift();
 }
 
+[[clang::noinline]] static void randomize_sprites() {
+  for (u8 i = 0; i < 8; i++) {
+    oam_buf[i].x = xorshift();
+    oam_buf[i].y = xorshift();
+  }
+}
+
 static void init_sprites() {
   for (u8 i = 0; i < 8; ++i) {
     oam_buf[i].tile = 10; // Arrow
@@ -102,6 +116,7 @@ static void init_sprites() {
 }
 
 int main() {
+  init_first_row();
   init_framebuffer();
   init_nametable_remainder();
   init_sprites();
@@ -122,6 +137,8 @@ int main() {
   PPU.control = 0b10001000;
   PPU.mask = 0b0011110;
 
-  while (true)
+  while (true) {
     randomize_tiles();
+    randomize_sprites();
+  }
 }

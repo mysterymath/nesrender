@@ -15,9 +15,9 @@ frame_buffer:
   sta PPUMASK
 
   ; Run the framebuffer copy routine.
-  lda #>$2000
+  lda #>($2000 + 32)
   sta PPUADDR
-  lda #<$2000
+  lda #<($2000 + 32)
   sta PPUADDR
   jsr frame_buffer
 
@@ -36,11 +36,6 @@ frame_buffer:
   sta OAMADDR
   lda #>oam_buf
   sta OAMDMA
-
-  ; Empirically add NOPs until it doesn't glitch 
-  .rept 0
-  nop
-  .endr
 
   ; Re-enable rendering.
   lda #0b00011110
