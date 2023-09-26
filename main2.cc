@@ -1,6 +1,7 @@
 #include <ines.h>
 #include <nes.h>
 #include <peekpoke.h>
+#include <soa.h>
 #include <stdint.h>
 
 // Configure for SNROM MMC1 board.
@@ -10,17 +11,32 @@ MAPPER_PRG_RAM_KB(8);
 typedef uint16_t u16;
 typedef uint8_t u8;
 
+/* 16-bit xorshift PRNG */
+u16 xorshift() {
+  static u16 x = 1;
+  x ^= x << 7;
+  x ^= x >> 9;
+  x ^= x << 8;
+  return x;
+}
+
 constexpr u16 ppu_bg_pals = 0x3f00;
 constexpr u16 ppu_spr_pals = 0x3f11;
 
-struct oam {
+struct OAM {
   u8 y;
   u8 tile;
   u8 attrs;
   u8 x;
 };
 
-alignas(256) oam oam_buf[64];
+alignas(256) OAM oam_buf[64];
+
+constexpr u8 fb_height_tiles = 21;
+constexpr u8 fb_width_tiles = 32;
+
+constexpr u8 fb_height = fb_height_tiles * 2;
+constexpr u8 fb_width = fb_width_tiles * 2;
 
 __attribute__((always_inline)) static inline void mmc1_register_write(u16 addr,
                                                                       u8 val) {
@@ -45,20 +61,41 @@ volatile uint8_t c;
 
 constexpr u16 mmc1_ctrl = 0x8000;
 
-constexpr u8 fb_height_tiles = 21;
-constexpr u8 fb_width_tiles = 32;
-
 constexpr u8 frame_buffer_stride = 2 + 3; // LDA imm, STA abs
 extern volatile u8
     frame_buffer[frame_buffer_stride * fb_height_tiles * fb_width_tiles + 1];
 
-/* 16-bit xorshift PRNG */
-unsigned xorshift() {
-  static unsigned x = 1;
-  x ^= x << 7;
-  x ^= x >> 9;
-  x ^= x << 8;
-  return x;
+// Two columns of the frame buffer, expanded out to one byte per pixel.
+struct FrameBufferColumns {
+  u8 pixels[2][fb_height];
+
+  void randomize();
+
+  void render(u8 tile_x) const;
+};
+
+FrameBufferColumns frame_buffer_columns;
+
+[[clang::noinline]] void FrameBufferColumns::randomize() {
+  for (u8 x = 0; x < 2; x++)
+    for (u8 y = 0; y < fb_height; y++)
+      pixels[x][y] = xorshift() % 4;
+}
+
+[[clang::noinline]] void FrameBufferColumns::render(u8 tile_x) const {
+  volatile u8 *fb = frame_buffer + 1 + tile_x * frame_buffer_stride;
+#pragma clang loop unroll(full)
+  for (u8 y = 0; y < fb_height; y += 2) {
+    u8 color = pixels[1][y + 1];
+    color <<= 2;
+    color |= pixels[1][y];
+    color <<= 2;
+    color |= pixels[0][y + 1];
+    color <<= 2;
+    color |= pixels[0][y];
+    *fb = color;
+    fb += frame_buffer_stride * fb_width_tiles;
+  }
 }
 
 // The first row is corrupted, so black it out.
@@ -93,11 +130,6 @@ static void init_nametable_remainder() {
   // Zero the attribute table.
   for (; i < 1024; i++)
     PPU.vram.data = 0;
-}
-
-[[clang::noinline]] static void randomize_tiles() {
-  for (u16 idx = 1; idx < sizeof(frame_buffer); idx += 5)
-    frame_buffer[idx] = xorshift();
 }
 
 [[clang::noinline]] static void randomize_sprites() {
@@ -138,7 +170,10 @@ int main() {
   PPU.mask = 0b0011110;
 
   while (true) {
-    randomize_tiles();
+    for (u8 x_tile = 0; x_tile < fb_width_tiles; ++x_tile) {
+      frame_buffer_columns.randomize();
+      frame_buffer_columns.render(x_tile);
+    }
     randomize_sprites();
   }
 }
