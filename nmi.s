@@ -14,10 +14,6 @@ frame_buffer:
   lda #0
   sta PPUMASK
 
-  ; Run OAMDMA
-  lda #>oam_buf
-  sta OAMDMA
-  
   ; Run the framebuffer copy routine.
   lda #>$2000
   sta PPUADDR
@@ -35,11 +31,17 @@ frame_buffer:
   lda #<$2000
   sta PPUADDR
 
+  ; Run OAMDMA last, since its previous value may have decayed
+  lda #0
+  sta OAMADDR
+  lda #>oam_buf
+  sta OAMDMA
+
   ; Empirically add NOPs until it doesn't glitch 
   .rept 0
   nop
   .endr
 
   ; Re-enable rendering.
-  lda #0b00001110
+  lda #0b00011110
   sta PPUMASK
