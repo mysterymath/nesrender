@@ -19,7 +19,7 @@ asm(".globl __chr_rom_size\n"
     "__chr_rom_size = 8\n"
     ".globl __prg_ram_size\n"
     "__prg_ram_size = 8\n");
-
+  
 extern Map sectors_map;
 extern Map square_map;
 extern Map outer_inner_map;

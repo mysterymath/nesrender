@@ -1,5 +1,7 @@
 .include "nes.inc"
 
+.zeropage frame_count
+
 ; The framebuffer is maintained as a mutable routine to copy the contents to the
 ; PPU as quickly as possible.
 .section .prg_ram_0,"aw",@nobits
@@ -8,6 +10,8 @@ frame_buffer:
   .fill 24*32*(2+3)+1 ; 24 tiles x (LDA imm + STA abs) + RTS
 
 .section .nmi.100,"axR",@progbits
+  inc frame_count 
+
   lda PPUSTATUS
 
   ; Disable rendering; we need slightly more than one vblank.

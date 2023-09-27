@@ -11,6 +11,8 @@ MAPPER_PRG_RAM_KB(8);
 typedef uint16_t u16;
 typedef uint8_t u8;
 
+__attribute__((section(".zp.bss"))) volatile u8 frame_count;
+
 /* 16-bit xorshift PRNG */
 u16 xorshift() {
   static u16 x = 1;
@@ -132,26 +134,14 @@ static void init_nametable_remainder() {
     PPU.vram.data = 0;
 }
 
-[[clang::noinline]] static void randomize_sprites() {
-  for (u8 i = 0; i < 8; i++) {
-    oam_buf[i].x = xorshift();
-    oam_buf[i].y = xorshift();
-  }
-}
-
-static void init_sprites() {
-  for (u8 i = 0; i < 8; ++i) {
-    oam_buf[i].tile = 10; // Arrow
-    oam_buf[i].x = xorshift();
-    oam_buf[i].y = xorshift();
-  }
+void update() {
+  // TODO
 }
 
 int main() {
   init_first_row();
   init_framebuffer();
   init_nametable_remainder();
-  init_sprites();
 
   mmc1_register_write(mmc1_ctrl, 0b01100);
   PPU.control = 0b00001000;
@@ -166,14 +156,33 @@ int main() {
   for (u16 i = 0; i < sizeof(spr_pals); i++)
     PPU.vram.data = spr_pals[i];
 
+  // FPS counter
+  oam_buf[0].x = 8;
+  oam_buf[0].y = 24;
+  oam_buf[1].x = 16;
+  oam_buf[1].y = 24;
+
   PPU.control = 0b10001000;
   PPU.mask = 0b0011110;
 
+  uint8_t last_update = frame_count;
   while (true) {
-    for (u8 x_tile = 0; x_tile < fb_width_tiles; ++x_tile) {
-      frame_buffer_columns.randomize();
-      frame_buffer_columns.render(x_tile);
+    uint8_t cur_update = frame_count;
+    uint8_t fps =
+        60 / (cur_update < last_update ? cur_update + 256 - last_update
+                                       : cur_update - last_update);
+
+    // Handle wraparound if any.
+    if (cur_update < last_update) {
+      while (!__builtin_add_overflow(last_update, 3, &last_update))
+        ;
     }
-    randomize_sprites();
+    for (; last_update < cur_update; last_update += 3)
+      update();
+    oam_buf[0].tile = fps / 10;
+    oam_buf[1].tile = fps % 10;
+
+    for (u8 x_tile = 0; x_tile < fb_width_tiles; ++x_tile)
+      frame_buffer_columns.render(x_tile);
   }
 }
