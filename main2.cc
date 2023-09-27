@@ -165,6 +165,7 @@ int main() {
   PPU.control = 0b10001000;
   PPU.mask = 0b0011110;
 
+  // TODO: This needs work
   uint8_t last_update = frame_count;
   while (true) {
     uint8_t cur_update = frame_count;
