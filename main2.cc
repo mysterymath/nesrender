@@ -165,25 +165,31 @@ int main() {
   PPU.control = 0b10001000;
   PPU.mask = 0b0011110;
 
-  // TODO: This needs work
   uint8_t last_update = frame_count;
+  uint8_t last_render = frame_count;
   while (true) {
-    uint8_t cur_update = frame_count;
-    uint8_t fps =
-        60 / (cur_update < last_update ? cur_update + 256 - last_update
-                                       : cur_update - last_update);
+    uint8_t cur_frame = frame_count;
 
     // Handle wraparound if any.
-    if (cur_update < last_update) {
-      while (!__builtin_add_overflow(last_update, 3, &last_update))
+    if (cur_frame < last_update) {
+      while (!__builtin_add_overflow(last_update, 2, &last_update))
         ;
     }
-    for (; last_update < cur_update; last_update += 3)
+
+    if (last_update >= cur_frame)
+      continue;
+
+    for (; last_update < cur_frame; last_update += 2)
       update();
+
+    uint8_t fps =
+        60 / (cur_frame < last_render ? cur_frame + 256 - last_render
+                                       : cur_frame - last_render);
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
     for (u8 x_tile = 0; x_tile < fb_width_tiles; ++x_tile)
       frame_buffer_columns.render(x_tile);
+    last_render = cur_frame;
   }
 }
