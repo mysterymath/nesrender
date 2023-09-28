@@ -39,6 +39,8 @@ set_property(SOURCE chr.s PROPERTY
 
 add_executable(render2
   chr.s
+  framebuffer.cc
+  framebuffer.S
   main2.cc
   nmi.s
 )

@@ -2,14 +2,13 @@
 #include <nes.h>
 #include <peekpoke.h>
 #include <soa.h>
-#include <stdint.h>
+
+#include "framebuffer.h"
+#include "types.h"
 
 // Configure for SNROM MMC1 board.
 MAPPER_CHR_ROM_KB(8);
 MAPPER_PRG_RAM_KB(8);
-
-typedef uint16_t u16;
-typedef uint8_t u8;
 
 __attribute__((section(".zp.bss"))) volatile u8 frame_count;
 
@@ -34,12 +33,6 @@ struct OAM {
 
 alignas(256) OAM oam_buf[64];
 
-constexpr u8 fb_height_tiles = 21;
-constexpr u8 fb_width_tiles = 32;
-
-constexpr u8 fb_height = fb_height_tiles * 2;
-constexpr u8 fb_width = fb_width_tiles * 2;
-
 __attribute__((always_inline)) static inline void mmc1_register_write(u16 addr,
                                                                       u8 val) {
   POKE(addr, val);
@@ -63,71 +56,34 @@ volatile uint8_t c;
 
 constexpr u16 mmc1_ctrl = 0x8000;
 
-constexpr u8 frame_buffer_stride = 2 + 3; // LDA imm, STA abs
-extern volatile u8
-    frame_buffer[frame_buffer_stride * fb_height_tiles * fb_width_tiles + 1];
-
-// Two columns of the frame buffer, expanded out to one byte per pixel.
-struct FrameBufferColumns {
-  u8 pixels[2][fb_height];
-
-  void randomize();
-
-  void render(u8 tile_x) const;
-};
-
-FrameBufferColumns frame_buffer_columns;
-
-[[clang::noinline]] void FrameBufferColumns::randomize() {
-  for (u8 x = 0; x < 2; x++)
-    for (u8 y = 0; y < fb_height; y++)
-      pixels[x][y] = xorshift() % 4;
-}
-
-[[clang::noinline]] void FrameBufferColumns::render(u8 tile_x) const {
-  volatile u8 *fb = frame_buffer + 1 + tile_x * frame_buffer_stride;
-#pragma clang loop unroll(full)
-  for (u8 y = 0; y < fb_height; y += 2) {
-    u8 color = pixels[1][y + 1];
-    color <<= 2;
-    color |= pixels[1][y];
-    color <<= 2;
-    color |= pixels[0][y + 1];
-    color <<= 2;
-    color |= pixels[0][y];
-    *fb = color;
-    fb += frame_buffer_stride * fb_width_tiles;
-  }
-}
-
 // The first row is corrupted, so black it out.
 static void init_first_row() {
   ppu_set_addr(0x2000);
-  for (u8 i = 0; i < fb_width_tiles; i++)
+  for (u8 i = 0; i < FRAMEBUFFER_WIDTH_TILES; i++)
     PPU.vram.data = 0;
 }
 
 static void init_framebuffer() {
   u16 tile = 0;
-  for (u16 i = 0; i < sizeof(frame_buffer);) {
+  for (u16 i = 0; i < sizeof(framebuffer);) {
     static constexpr u8 lda_imm = 0xa9;
-    frame_buffer[i++] = lda_imm;
-    frame_buffer[i++] = tile++;
+    framebuffer[i++] = lda_imm;
+    framebuffer[i++] = tile++;
 
     static constexpr u8 sta_abs = 0x8d;
-    frame_buffer[i++] = sta_abs;
-    frame_buffer[i++] = reinterpret_cast<u16>(&PPU.vram.data) & 0xff;
-    frame_buffer[i++] = reinterpret_cast<u16>(&PPU.vram.data) >> 8;
+    framebuffer[i++] = sta_abs;
+    framebuffer[i++] = reinterpret_cast<u16>(&PPU.vram.data) & 0xff;
+    framebuffer[i++] = reinterpret_cast<u16>(&PPU.vram.data) >> 8;
   }
   static constexpr u8 rts = 0x60;
-  frame_buffer[sizeof(frame_buffer) - 1] = rts; // RTS
+  framebuffer[sizeof(framebuffer) - 1] = rts; // RTS
 }
 
 // Fill the hud w/ a nice checkerboard pattern and zero the attribute table.
 static void init_nametable_remainder() {
-  ppu_set_addr(0x2000 + fb_height_tiles * fb_width_tiles);
+  ppu_set_addr(0x2000 + FRAMEBUFFER_HEIGHT_TILES * FRAMEBUFFER_WIDTH_TILES);
   u16 i;
-  for (i = fb_height_tiles * fb_width_tiles; i < 30 * 32; i++)
+  for (i = FRAMEBUFFER_HEIGHT_TILES * FRAMEBUFFER_WIDTH_TILES; i < 30 * 32; i++)
     PPU.vram.data = 86;
   // Zero the attribute table.
   for (; i < 1024; i++)
@@ -143,7 +99,7 @@ int main() {
   init_framebuffer();
   init_nametable_remainder();
 
-  mmc1_register_write(mmc1_ctrl, 0b01100);
+      mmc1_register_write(mmc1_ctrl, 0b01100);
   PPU.control = 0b00001000;
 
   ppu_set_addr(ppu_bg_pals);
@@ -182,14 +138,15 @@ int main() {
     for (; last_update < cur_frame; last_update += 2)
       update();
 
-    uint8_t fps =
-        60 / (cur_frame < last_render ? cur_frame + 256 - last_render
-                                       : cur_frame - last_render);
+    uint8_t fps = 60 / (cur_frame < last_render ? cur_frame + 256 - last_render
+                                                : cur_frame - last_render);
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
-    for (u8 x_tile = 0; x_tile < fb_width_tiles; ++x_tile)
-      frame_buffer_columns.render(x_tile);
+    for (u8 column_offset = 0;
+         column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
+         column_offset += framebuffer_stride)
+      render_framebuffer_columns(column_offset);
     last_render = cur_frame;
   }
 }
