@@ -99,7 +99,7 @@ int main() {
   init_framebuffer();
   init_nametable_remainder();
 
-      mmc1_register_write(mmc1_ctrl, 0b01100);
+  mmc1_register_write(mmc1_ctrl, 0b01100);
   PPU.control = 0b00001000;
 
   ppu_set_addr(ppu_bg_pals);
