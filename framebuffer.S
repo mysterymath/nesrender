@@ -47,13 +47,13 @@ render_span_right:
     sta framebuffer_columns+FRAMEBUFFER_HEIGHT,y
     iny
   .endr
-  rts
+  jmp .Lrender_span_right_return
 
 .rodata
 render_span_offsets:
   i = 0
-  .rept FRAMEBUFFER_HEIGHT
-    .byte (FRAMEBUFFER_HEIGHT - i) * (5 + 1) ; sta absidx, iny
+  .rept FRAMEBUFFER_HEIGHT+1
+    .byte (FRAMEBUFFER_HEIGHT - i) * (3 + 1) ; sta absidx, iny
     i = i + 1
   .endr
 

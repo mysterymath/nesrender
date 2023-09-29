@@ -1,8 +1,10 @@
 #include <ines.h>
 #include <nes.h>
+#include <neslib.h>
 #include <peekpoke.h>
 #include <soa.h>
 
+#include "framebuffer-constants.h"
 #include "framebuffer.h"
 #include "types.h"
 
@@ -94,6 +96,24 @@ void update() {
   // TODO
 }
 
+void randomize_span_buffer() {
+  span_buffer.clear();
+  u8 offset = 0;
+  while (true) {
+    u8 color = xorshift() % 4;
+    u8 len = xorshift() % 32;
+    bool done = false;
+    if (offset + len >= FRAMEBUFFER_HEIGHT) {
+      len = FRAMEBUFFER_HEIGHT - offset;
+      done = true;
+    }
+    span_buffer.push_back({color, len});
+    if (done)
+      return;
+    offset += len;
+  }
+}
+
 int main() {
   init_first_row();
   init_framebuffer();
@@ -146,7 +166,9 @@ int main() {
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {
+      randomize_span_buffer();
       render_span_buffer_left();
+      randomize_span_buffer();
       render_span_buffer_right();
       render_framebuffer_columns(column_offset);
     }

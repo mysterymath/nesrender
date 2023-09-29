@@ -31,7 +31,11 @@ struct Span {
 // A buffer of spans to fill one column of the framebuffer.
 class SpanBuffer {
   u8 size;
-  soa::Array<Span, 21> buffer;
+  soa::Array<Span, FRAMEBUFFER_HEIGHT> buffer;
+
+public:
+  void clear();
+  void push_back(Span s);
 };
 
 extern struct SpanBuffer span_buffer;

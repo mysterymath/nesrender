@@ -29,3 +29,11 @@ __attribute__((section(".zp.data"))) volatile u8 *framebuffer_row_ptrs[FRAMEBUFF
 u8 framebuffer_columns[2][FRAMEBUFFER_HEIGHT];
 
 SpanBuffer span_buffer;
+
+void SpanBuffer::clear() {
+  size = 0;
+}
+
+void SpanBuffer::push_back(Span s) {
+  buffer[size++] = s;
+}
