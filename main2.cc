@@ -123,7 +123,7 @@ int main() {
   PPU.control = 0b00001000;
 
   ppu_set_addr(ppu_bg_pals);
-  static const uint8_t bg_pals[16] = {0x0f, 0x06, 0x16, 0x0c};
+  static const uint8_t bg_pals[16] = {0x0f, 0x06, 0x16, 0x26};
   for (u16 i = 0; i < sizeof(bg_pals); i++)
     PPU.vram.data = bg_pals[i];
 
