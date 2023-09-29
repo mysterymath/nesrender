@@ -1,6 +1,8 @@
 #ifndef FRAMEBUFFER_H
 #define FRAMEBUFFER_H
 
+#include <soa.h>
+
 #include "framebuffer-constants.h"
 #include "types.h"
 
@@ -9,8 +11,35 @@ extern volatile u8 framebuffer[framebuffer_stride * FRAMEBUFFER_HEIGHT_TILES *
                                    FRAMEBUFFER_WIDTH_TILES +
                                1];
 
+// Two columns of the frame buffer, expanded out to one byte per pixel.
 extern u8 framebuffer_columns[2][FRAMEBUFFER_HEIGHT];
 
-extern "C" __attribute__((leaf)) void render_framebuffer_columns(u8 column_offset);
+// Render the framebuffer columns to the framebuffer at the given column byte
+// offset.
+extern "C" __attribute__((leaf)) void
+render_framebuffer_columns(u8 column_offset);
+
+// A contiguous vertical span of the same color
+struct Span {
+  u8 color;  // 0-3
+  u8 length; // in pixels
+};
+#define SOA_STRUCT Span
+#define SOA_MEMBERS MEMBER(color) MEMBER(length)
+#include <soa-struct.inc>
+
+// A buffer of spans to fill one column of the framebuffer.
+class SpanBuffer {
+  u8 size;
+  soa::Array<Span, 21> buffer;
+};
+
+extern struct SpanBuffer span_buffer;
+
+// Render the span buffer to the leftmost framebuffer column.
+extern "C" __attribute__((leaf)) void render_span_buffer_left();
+
+// Render the span buffer to the rightmost framebuffer column.
+extern "C" __attribute__((leaf)) void render_span_buffer_right();
 
 #endif // not FRAMEBUFFER_H

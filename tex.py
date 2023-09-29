@@ -6,6 +6,7 @@ palIm = Image.new('P', (1,1))
 palIm.putpalette(pal)
 
 with Image.open(sys.argv[1]) as im:
-    im = im.resize((64,42), Image.Resampling.LANCZOS)
+    #im = im.resize((64,42), Image.Resampling.LANCZOS)
+    im = im.resize((2,1), Image.Resampling.LANCZOS)
     im = im.quantize(palette=palIm, dither=Image.Dither.NONE)
     im.save(sys.argv[2])

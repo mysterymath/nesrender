@@ -26,5 +26,6 @@ __attribute__((section(".zp.data"))) volatile u8 *framebuffer_row_ptrs[FRAMEBUFF
   &framebuffer[1 + 20 * framebuffer_stride * FRAMEBUFFER_WIDTH_TILES],
 };
 
-// Two columns of the frame buffer, expanded out to one byte per pixel.
 u8 framebuffer_columns[2][FRAMEBUFFER_HEIGHT];
+
+SpanBuffer span_buffer;

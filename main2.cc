@@ -145,8 +145,11 @@ int main() {
 
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
-         column_offset += framebuffer_stride)
+         column_offset += framebuffer_stride) {
+      render_span_buffer_left();
+      render_span_buffer_right();
       render_framebuffer_columns(column_offset);
+    }
     last_render = cur_frame;
   }
 }

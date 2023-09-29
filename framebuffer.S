@@ -30,3 +30,85 @@ render_framebuffer_columns:
   .endr
 
   rts
+
+.section .text.render_span_left,"ax",@progbits
+.balign 256
+render_span_left:
+  .rept FRAMEBUFFER_HEIGHT
+    sta framebuffer_columns,y
+    iny
+  .endr
+  jmp .Lrender_span_left_return
+
+.section .text.render_span_right,"ax",@progbits
+.balign 256
+render_span_right:
+  .rept FRAMEBUFFER_HEIGHT
+    sta framebuffer_columns+FRAMEBUFFER_HEIGHT,y
+    iny
+  .endr
+  rts
+
+.rodata
+render_span_offsets:
+  i = 0
+  .rept FRAMEBUFFER_HEIGHT
+    .byte (FRAMEBUFFER_HEIGHT - i) * (5 + 1) ; sta absidx, iny
+    i = i + 1
+  .endr
+
+.text
+.globl render_span_buffer_left
+render_span_buffer_left:
+  lda #>render_span_left
+  sta __rc5
+
+  lda span_buffer ; Size
+  sta __rc2
+  ldx #0
+  ldy #0
+.Lloop_left:
+  lda span_buffer+1+FRAMEBUFFER_HEIGHT,x ; Length
+  stx __rc3
+  tax
+  lda render_span_offsets,x
+  sta __rc4
+  ldx __rc3
+
+  ; Render the span
+  lda span_buffer+1,x ; Color
+  jmp (__rc4)
+
+.Lrender_span_left_return:
+  inx
+  cpx __rc2
+  bne .Lloop_left
+  rts
+
+.text
+.globl render_span_buffer_right
+render_span_buffer_right:
+  lda #>render_span_right
+  sta __rc5
+
+  lda span_buffer ; Size
+  sta __rc2
+  ldx #0
+  ldy #0
+.Lloop_right:
+  lda span_buffer+1+FRAMEBUFFER_HEIGHT,x ; Length
+  stx __rc3
+  tax
+  lda render_span_offsets,x
+  sta __rc4
+  ldx __rc3
+
+  ; Render the span
+  lda span_buffer+1,x ; Color
+  jmp (__rc4)
+
+.Lrender_span_right_return:
+  inx
+  cpx __rc2
+  bne .Lloop_right
+  rts
