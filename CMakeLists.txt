@@ -41,6 +41,7 @@ add_executable(render2
   chr.s
   framebuffer.cc
   framebuffer.S
+  logo.cc
   main2.cc
   nmi.s
 )
