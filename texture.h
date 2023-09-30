@@ -3,29 +3,21 @@
 
 #include "types.h"
 
-class TextureSpan {
+struct TextureSpan {
   u8 color;
   u8 size;
 };
 
-class TextureColumn {
+struct TextureColumn {
   u8 size;
-  // An array of length `size`.
-  TextureSpan *spans;
-
-public:
-  const TextureSpan& operator[](u8 index) const;
+  TextureSpan spans[];
 };
 
-class Texture {
+struct Texture {
   u8 width;
   u8 height;
 
-  // An array of length `width`.
-  TextureColumn *columns;
-
-public:
-  const TextureColumn& operator[](u8 index) const;
+  TextureColumn columns[];
 };
 
 #endif // not TEXTURE_H

@@ -6,10 +6,12 @@ palIm = Image.new('P', (1,1))
 palIm.putpalette(pal)
 
 #target_size = (64, 42)
-#target_size = (128, 84)
-target_size = (256, 168)
+target_size = (128, 84)
 
-with Image.open(sys.argv[1]) as im:
+image_filename = sys.argv[1]
+name = sys.argv[2]
+
+with Image.open(image_filename) as im:
     new_width = int(target_size[1] / im.height * im.width)
     new_height = int(target_size[0] / im.width * im.height)
     if new_width > target_size[0]:
@@ -33,6 +35,20 @@ with Image.open(sys.argv[1]) as im:
             spans.append([color, 1])
       columns.append(spans)
 
-    print(sum(2*len(spans) for spans in columns))
+    with open(name + '.h', 'w') as f:
+      macro = f"{name.upper()}_H"
+      print(f"#ifndef {macro}", file=f)
+      print(f"#define {macro}", file=f)
+      print(f"extern const Texture {name};", file=f)
+      print(f"#endif // not {macro}", file=f)
+    with open(name + '.cc', 'w') as f:
+      print("#include \"types.h\"\n", file=f)
+      print(f"constexpr u8 {name}_bytes[] = {'{'}", file=f)
+      print(f"  {im.width}, {im.height},", file=f)
+      for spans in columns:
+        print(f"  {len(spans)},", file=f)
+        for span in spans:
+          print(f"    {span[0]}, {span[1]},", file=f)
+      print("};", file=f)
 
-    im.save(sys.argv[2])
+    im.save(name + '.png')
