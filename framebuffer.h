@@ -21,11 +21,11 @@ render_framebuffer_columns(u8 column_offset);
 
 // A contiguous vertical span of the same color
 struct Span {
-  u8 color;  // 0-3
-  u8 length; // in pixels
+  u8 color; // 0-3
+  u8 size; // in pixels
 };
 #define SOA_STRUCT Span
-#define SOA_MEMBERS MEMBER(color) MEMBER(length)
+#define SOA_MEMBERS MEMBER(color) MEMBER(size)
 #include <soa-struct.inc>
 
 // A buffer of spans to fill one column of the framebuffer.

@@ -101,16 +101,16 @@ void randomize_span_buffer() {
   u8 offset = 0;
   while (true) {
     u8 color = xorshift() % 4;
-    u8 len = xorshift() % 32;
+    u8 size = xorshift() % 32;
     bool done = false;
-    if (offset + len >= FRAMEBUFFER_HEIGHT) {
-      len = FRAMEBUFFER_HEIGHT - offset;
+    if (offset + size >= FRAMEBUFFER_HEIGHT) {
+      size = FRAMEBUFFER_HEIGHT - offset;
       done = true;
     }
-    span_buffer.push_back({color, len});
+    span_buffer.push_back({color, size});
     if (done)
       return;
-    offset += len;
+    offset += size;
   }
 }
 
