@@ -11,6 +11,9 @@ struct TextureSpan {
 struct TextureColumn {
   u8 size;
   TextureSpan spans[];
+
+  // Render the column at a 1:1 scale to the span buffer.
+  void render() const;
 };
 
 struct Texture {
