@@ -12,6 +12,9 @@ struct TextureColumn {
   u8 size;
   TextureSpan spans[];
 
+  // Return the texture column to the right of this one.
+  const TextureColumn *next() const;
+
   // Render the column at a 1:1 scale to the span buffer.
   void render() const;
 };

@@ -168,9 +168,11 @@ int main() {
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {
-      (texture_column++)->render();
+      texture_column->render();
+      texture_column = texture_column->next();
       render_span_buffer_left();
-      (texture_column++)->render();
+      texture_column->render();
+      texture_column = texture_column->next();
       render_span_buffer_right();
       render_framebuffer_columns(column_offset);
     }
