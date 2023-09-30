@@ -6,6 +6,7 @@
 
 #include "framebuffer-constants.h"
 #include "framebuffer.h"
+#include "logo.h"
 #include "types.h"
 
 // Configure for SNROM MMC1 board.
@@ -163,12 +164,13 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
+    const TextureColumn *texture_column = logo.columns;
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {
-      randomize_span_buffer();
+      (texture_column++)->render();
       render_span_buffer_left();
-      randomize_span_buffer();
+      (texture_column++)->render();
       render_span_buffer_right();
       render_framebuffer_columns(column_offset);
     }

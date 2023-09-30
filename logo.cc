@@ -1,6 +1,8 @@
+#include "logo.h"
+
 #include "types.h"
 
-constexpr u8 logo_bytes[] = {
+const u8 logo_bytes[] = {
   128, 72,
   1,
     0, 72,

@@ -39,11 +39,14 @@ with Image.open(image_filename) as im:
       macro = f"{name.upper()}_H"
       print(f"#ifndef {macro}", file=f)
       print(f"#define {macro}", file=f)
-      print(f"extern const Texture {name};", file=f)
+      print("#include \"texture.h\"", file=f)
+      print(f"extern const u8 {name}_bytes[];", file=f)
+      print(f"#define {name} (*reinterpret_cast<const Texture*>({name}_bytes))", file=f)
       print(f"#endif // not {macro}", file=f)
     with open(name + '.cc', 'w') as f:
+      print(f"#include \"{name}.h\"\n", file=f)
       print("#include \"types.h\"\n", file=f)
-      print(f"constexpr u8 {name}_bytes[] = {'{'}", file=f)
+      print(f"const u8 {name}_bytes[] = {'{'}", file=f)
       print(f"  {im.width}, {im.height},", file=f)
       for spans in columns:
         print(f"  {len(spans)},", file=f)
