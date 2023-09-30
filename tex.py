@@ -20,4 +20,19 @@ with Image.open(sys.argv[1]) as im:
     im = ImageOps.grayscale(im)
     im = ImageOps.colorize(im, (0,0,0), (255, 0, 0))
     im = im.quantize(palette=palIm, dither=Image.Dither.NONE)
+
+    pixels = list(im.getdata())
+    columns = []
+    for x in range(im.width):
+      spans = [[pixels[x], 1]]
+      for y in range(1, im.height):
+        color = pixels[y*im.width + x]
+        if color == spans[-1][0]:
+            spans[-1][1] += 1
+        else:
+            spans.append([color, 1])
+      columns.append(spans)
+
+    print(sum(2*len(spans) for spans in columns))
+
     im.save(sys.argv[2])
