@@ -142,10 +142,10 @@ int main() {
   PPU.control = 0b10001000;
   PPU.mask = 0b0011110;
 
-  uint8_t last_update = frame_count;
-  uint8_t last_render = frame_count;
+  u8 last_update = frame_count;
+  u8 last_render = frame_count;
   while (true) {
-    uint8_t cur_frame = frame_count;
+    u8 cur_frame = frame_count;
 
     // Handle wraparound if any.
     if (cur_frame < last_update) {
@@ -159,8 +159,8 @@ int main() {
     for (; last_update < cur_frame; last_update += 2)
       update();
 
-    uint8_t fps = 60 / (cur_frame < last_render ? cur_frame + 256 - last_render
-                                                : cur_frame - last_render);
+    u8 fps = 60 / (cur_frame < last_render ? cur_frame + 256 - last_render
+                                           : cur_frame - last_render);
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
