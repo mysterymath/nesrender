@@ -93,8 +93,26 @@ static void init_nametable_remainder() {
     PPU.vram.data = 0;
 }
 
+void latch_joypads() {
+  JOYPAD[0] = 1;
+  JOYPAD[0] = 0;
+}
+
+u8 joy1_prev;
+u8 joy1;
+
+void read_joypad1() {
+  joy1_prev = joy1;
+  joy1 = 0;
+  for (u8 i = 0; i < 8; i++) {
+    joy1 >>= 1;
+    joy1 |= JOYPAD[0] << 7;
+  }
+}
+
 void update() {
-  // TODO
+  latch_joypads();
+  read_joypad1();
 }
 
 void randomize_span_buffer() {
