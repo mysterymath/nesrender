@@ -2,6 +2,7 @@
 #include <nes.h>
 #include <neslib.h>
 #include <peekpoke.h>
+#include <stdio.h>
 #include <soa.h>
 
 #include "framebuffer-constants.h"
@@ -116,14 +117,23 @@ u16 x_offset = 0;
 void update() {
   latch_joypads();
   read_joypad1();
-  if (joy1 & JOY_RIGHT_MASK)
-    x_offset -= 10;
-  if (joy1 & JOY_LEFT_MASK)
-    x_offset += 10;
-  if (joy1 & JOY_BTN_A_MASK & JOY_RIGHT_MASK)
-    x_scale -= 10;
-  if (joy1 & JOY_BTN_A_MASK & JOY_LEFT_MASK)
-    x_scale += 10;
+  if (joy1 & JOY_BTN_A_MASK) {
+    if (joy1 & JOY_RIGHT_MASK)
+      x_scale -= 10;
+    if (joy1 & JOY_LEFT_MASK)
+      x_scale += 10;
+  } else {
+    if (joy1 & JOY_RIGHT_MASK) {
+      if (x_offset < 64)
+        x_offset += logo.width << 8;
+      x_offset -= 64;
+    }
+    if (joy1 & JOY_LEFT_MASK) {
+      x_offset += 64;
+      if (x_offset >= logo.width << 8)
+        x_offset -= logo.width << 8;
+    }
+  }
 }
 
 void randomize_span_buffer() {
@@ -194,15 +204,18 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
-    u16 x_pos = x_offset + 128;
+    u16 x_pos = x_offset + x_scale/2;
+    if (x_pos >= logo.width << 8)
+      x_pos -= logo.width << 8;
+
     u8 x_col;
     const TextureColumn *texture_column = logo.columns;
-    for (x_col = 0; x_col < x_offset << 8; ++x_col)
+    for (x_col = 0; x_col != x_pos >> 8; ++x_col)
       texture_column = texture_column->next();
 
     const auto advance_column = [&] {
       x_pos += x_scale;
-      if (x_pos >> 8 >= logo.width) {
+      if (x_pos >= logo.width << 8) {
         x_pos -= logo.width << 8;
         texture_column = logo.columns;
         x_col = 0;
@@ -224,3 +237,5 @@ int main() {
     last_render = cur_frame;
   }
 }
+
+extern "C" void __putchar(char c) { POKE(0x4018, c); }
