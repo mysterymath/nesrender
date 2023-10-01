@@ -115,11 +115,10 @@ u16 x_scale = 0x100;
 void update() {
   latch_joypads();
   read_joypad1();
-  u8 joy1_pressed = joy1 & ~joy1_prev;
-  if (joy1_pressed & JOY_RIGHT_MASK)
-    x_scale -= 64;
-  if (joy1_pressed & JOY_LEFT_MASK)
-    x_scale += 64;
+  if (joy1 & JOY_RIGHT_MASK)
+    x_scale -= 10;
+  if (joy1 & JOY_LEFT_MASK)
+    x_scale += 10;
 }
 
 void randomize_span_buffer() {
