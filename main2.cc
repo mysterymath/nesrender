@@ -172,16 +172,17 @@ int main() {
     u8 cur_frame = frame_count;
 
     // Handle wraparound if any.
-    if (cur_frame < last_update) {
+    if (cur_frame < last_update)
       while (!__builtin_add_overflow(last_update, 2, &last_update))
-        ;
-    }
+        update();
 
-    if (last_update >= cur_frame)
-      continue;
-
-    for (; last_update < cur_frame; last_update += 2)
+    while (last_update < cur_frame) {
+      // Even if cur_frame didn't wrap around, last_update may wrap around as it
+      // approaches a cur_frame near 255.
       update();
+      if (__builtin_add_overflow(last_update, 2, &last_update))
+        break;
+    }
 
     u8 fps = 60 / (cur_frame < last_render ? cur_frame + 256 - last_render
                                            : cur_frame - last_render);
@@ -189,7 +190,7 @@ int main() {
     oam_buf[1].tile = fps % 10;
 
     u8 x_col = 0;
-    u16 x_pos = 0;
+    u16 x_pos = 128;
     const TextureColumn *texture_column = logo.columns;
     const auto advance_column = [&] {
       x_pos += x_scale;
@@ -198,7 +199,7 @@ int main() {
         texture_column = logo.columns;
         x_col = 0;
       }
-      for (; x_col < x_pos >> 8; ++x_col)
+      for (; x_col != x_pos >> 8; ++x_col)
         texture_column = texture_column->next();
     };
     for (u8 column_offset = 0;
