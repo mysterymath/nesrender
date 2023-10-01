@@ -189,13 +189,17 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
-    u8 prev_x_col = 0;
+    u8 x_col = 0;
     u16 x_pos = 0;
     const TextureColumn *texture_column = logo.columns;
     const auto advance_column = [&] {
       x_pos += x_scale;
-      u8 x_col = x_pos >> 8;
-      for (; prev_x_col < x_col; ++prev_x_col)
+      if (x_pos >> 8 >= logo.width) {
+        x_pos -= logo.width << 8;
+        texture_column = logo.columns;
+        x_col = 0;
+      }
+      for (; x_col < x_pos >> 8; ++x_col)
         texture_column = texture_column->next();
     };
     for (u8 column_offset = 0;
