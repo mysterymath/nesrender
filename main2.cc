@@ -111,13 +111,18 @@ void read_joypad1() {
 }
 
 u16 x_scale = 0x100;
+u16 x_offset = 0;
 
 void update() {
   latch_joypads();
   read_joypad1();
   if (joy1 & JOY_RIGHT_MASK)
-    x_scale -= 10;
+    x_offset -= 10;
   if (joy1 & JOY_LEFT_MASK)
+    x_offset += 10;
+  if (joy1 & JOY_BTN_A_MASK & JOY_RIGHT_MASK)
+    x_scale -= 10;
+  if (joy1 & JOY_BTN_A_MASK & JOY_LEFT_MASK)
     x_scale += 10;
 }
 
@@ -189,9 +194,12 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
-    u8 x_col = 0;
-    u16 x_pos = 128;
+    u16 x_pos = x_offset + 128;
+    u8 x_col;
     const TextureColumn *texture_column = logo.columns;
+    for (x_col = 0; x_col < x_offset << 8; ++x_col)
+      texture_column = texture_column->next();
+
     const auto advance_column = [&] {
       x_pos += x_scale;
       if (x_pos >> 8 >= logo.width) {
