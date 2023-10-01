@@ -110,9 +110,16 @@ void read_joypad1() {
   }
 }
 
+u16 x_scale = 0x100;
+
 void update() {
   latch_joypads();
   read_joypad1();
+  u8 joy1_pressed = joy1 & ~joy1_prev;
+  if (joy1_pressed & JOY_RIGHT_MASK)
+    x_scale -= 64;
+  if (joy1_pressed & JOY_LEFT_MASK)
+    x_scale += 64;
 }
 
 void randomize_span_buffer() {
@@ -182,17 +189,25 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
+    u8 prev_x_col = 0;
+    u16 x_pos = 0;
     const TextureColumn *texture_column = logo.columns;
+    const auto advance_column = [&] {
+      x_pos += x_scale;
+      u8 x_col = x_pos >> 8;
+      for (; prev_x_col < x_col; ++prev_x_col)
+        texture_column = texture_column->next();
+    };
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {
       texture_column->render();
-      texture_column = texture_column->next();
       render_span_buffer_left();
+      advance_column();
       texture_column->render();
-      texture_column = texture_column->next();
       render_span_buffer_right();
       render_framebuffer_columns(column_offset);
+      advance_column();
     }
     last_render = cur_frame;
   }
