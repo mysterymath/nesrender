@@ -2,8 +2,8 @@
 #include <nes.h>
 #include <neslib.h>
 #include <peekpoke.h>
-#include <stdio.h>
 #include <soa.h>
+#include <stdio.h>
 
 #include "framebuffer-constants.h"
 #include "framebuffer.h"
@@ -114,26 +114,34 @@ void read_joypad1() {
 u16 x_scale = 0x100;
 u16 x_offset = 0;
 
+enum Select {
+  X_SCALE,
+  X_OFFSET,
+  SELECT_SIZE,
+} select;
+
+u16 *select_ptrs[] = {&x_scale, &x_offset};
+u16 select_wraps[] = {65535, u16(logo.width << 8)};
+u8 select_increments[] = {10, 64};
+
 void update() {
   latch_joypads();
   read_joypad1();
-  if (joy1 & JOY_BTN_A_MASK) {
-    if (joy1 & JOY_RIGHT_MASK)
-      x_scale -= 10;
-    if (joy1 & JOY_LEFT_MASK)
-      x_scale += 10;
-  } else {
-    if (joy1 & JOY_RIGHT_MASK) {
-      if (x_offset < 64)
-        x_offset += logo.width << 8;
-      x_offset -= 64;
-    }
-    if (joy1 & JOY_LEFT_MASK) {
-      x_offset += 64;
-      if (x_offset >= logo.width << 8)
-        x_offset -= logo.width << 8;
-    }
+  u16 *ptr = select_ptrs[select];
+  u16 wrap = select_wraps[select];
+  u8 increment = select_increments[select];
+  if (joy1 & JOY_RIGHT_MASK) {
+    if (*ptr < increment)
+      *ptr += wrap;
+    *ptr -= increment;
   }
+  if (joy1 & JOY_LEFT_MASK) {
+    *ptr += increment;
+    if (*ptr >= wrap)
+      *ptr -= wrap;
+  }
+  if (joy1 & ~joy1_prev & JOY_BTN_A_MASK)
+    select = Select((select + 1) % SELECT_SIZE);
 }
 
 int main() {
@@ -186,7 +194,7 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
-    u16 x_pos = x_offset + x_scale/2;
+    u16 x_pos = x_offset + x_scale / 2;
     if (x_pos >= logo.width << 8)
       x_pos -= logo.width << 8;
 
