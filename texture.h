@@ -16,7 +16,7 @@ struct TextureColumn {
   const TextureColumn *next() const;
 
   // Render the column at a 1:1 scale to the span buffer.
-  void render() const;
+  void render(bool left) const;
 };
 
 struct Texture {

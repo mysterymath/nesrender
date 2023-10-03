@@ -136,24 +136,6 @@ void update() {
   }
 }
 
-void randomize_span_buffer() {
-  span_buffer.clear();
-  u8 offset = 0;
-  while (true) {
-    u8 color = xorshift() % 4;
-    u8 size = xorshift() % 32;
-    bool done = false;
-    if (offset + size >= FRAMEBUFFER_HEIGHT) {
-      size = FRAMEBUFFER_HEIGHT - offset;
-      done = true;
-    }
-    span_buffer.push_back({color, size});
-    if (done)
-      return;
-    offset += size;
-  }
-}
-
 int main() {
   init_first_row();
   init_framebuffer();
@@ -226,11 +208,9 @@ int main() {
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {
-      texture_column->render();
-      render_span_buffer_left();
+      texture_column->render(/*left=*/true);
       advance_column();
-      texture_column->render();
-      render_span_buffer_right();
+      texture_column->render(/*left=*/false);
       render_framebuffer_columns(column_offset);
       advance_column();
     }

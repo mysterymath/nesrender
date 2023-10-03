@@ -19,31 +19,10 @@ extern u8 framebuffer_columns[2][FRAMEBUFFER_HEIGHT];
 extern "C" __attribute__((leaf)) void
 render_framebuffer_columns(u8 column_offset);
 
-// A contiguous vertical span of the same color
-struct Span {
-  u8 color; // 0-3
-  u8 size; // in pixels
-};
-#define SOA_STRUCT Span
-#define SOA_MEMBERS MEMBER(color) MEMBER(size)
-#include <soa-struct.inc>
+extern "C" __attribute__((leaf)) u8 render_span_left(u8 pos, u8 length,
+                                                     u8 color);
 
-// A buffer of spans to fill one column of the framebuffer.
-class SpanBuffer {
-  u8 size;
-  soa::Array<Span, FRAMEBUFFER_HEIGHT> buffer;
-
-public:
-  void clear();
-  void push_back(Span s);
-};
-
-extern struct SpanBuffer span_buffer;
-
-// Render the span buffer to the leftmost framebuffer column.
-extern "C" __attribute__((leaf)) void render_span_buffer_left();
-
-// Render the span buffer to the rightmost framebuffer column.
-extern "C" __attribute__((leaf)) void render_span_buffer_right();
+extern "C" __attribute__((leaf)) u8 render_span_right(u8 pos, u8 length,
+                                                      u8 color);
 
 #endif // not FRAMEBUFFER_H
