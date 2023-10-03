@@ -19,10 +19,11 @@ const TextureColumn *TextureColumn::next() const {
       done = true;
     }
     if (left)
-      pos = render_span_left(pos, span_size, span.color);
+      render_span_left(pos, span_size, span.color);
     else
-      pos = render_span_right(pos, span_size, span.color);
+      render_span_right(pos, span_size, span.color);
     if (done)
       break;
+    pos += span_size;
   }
 }

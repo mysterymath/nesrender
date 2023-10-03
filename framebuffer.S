@@ -38,7 +38,6 @@ render_span_left_core:
     sta framebuffer_columns,y
     iny
   .endr
-  tya
   rts
 
 .section .text.render_span_right_core,"ax",@progbits
@@ -48,7 +47,6 @@ render_span_right_core:
     sta framebuffer_columns+FRAMEBUFFER_HEIGHT,y
     iny
   .endr
-  tya
   rts
 
 .rodata

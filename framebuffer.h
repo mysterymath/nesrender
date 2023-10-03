@@ -19,10 +19,10 @@ extern u8 framebuffer_columns[2][FRAMEBUFFER_HEIGHT];
 extern "C" __attribute__((leaf)) void
 render_framebuffer_columns(u8 column_offset);
 
-extern "C" __attribute__((leaf)) u8 render_span_left(u8 pos, u8 length,
-                                                     u8 color);
+extern "C" __attribute__((leaf)) void render_span_left(u8 pos, u8 length,
+                                                       u8 color);
 
-extern "C" __attribute__((leaf)) u8 render_span_right(u8 pos, u8 length,
-                                                      u8 color);
+extern "C" __attribute__((leaf)) void render_span_right(u8 pos, u8 length,
+                                                        u8 color);
 
 #endif // not FRAMEBUFFER_H
