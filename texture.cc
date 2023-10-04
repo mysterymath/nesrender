@@ -26,12 +26,19 @@ extern Log v_scale;
   if (v_pos >= logo.height << 8)
     v_pos -= logo.height << 8;
 
+  u8 span_idx = 0;
+  u16 span_v_begin = 0;
   while (y_pos < y_end) {
     y_pos += 256;
     v_pos += v_scale;
-    u16 span_v_begin = 0;
-    for (u8 i = 0; i < size; ++i) {
-      const TextureSpan &span = spans[i];
+
+    if (span_v_begin > v_pos) {
+      span_idx = 0;
+      span_v_begin = 0;
+    }
+
+    for (; span_idx < size; ++i) {
+      const TextureSpan &span = spans[span_idx];
       u16 span_v_end = span_v_begin + span.size * v_scale;
       if (v_pos < span_v_end) {
         if (left)
