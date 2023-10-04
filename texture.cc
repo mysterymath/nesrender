@@ -37,7 +37,7 @@ extern Log v_scale;
       span_v_begin = 0;
     }
 
-    for (; span_idx < size; ++i) {
+    for (; span_idx < size; ++span_idx) {
       const TextureSpan &span = spans[span_idx];
       u16 span_v_end = span_v_begin + span.size * v_scale;
       if (v_pos < span_v_end) {
