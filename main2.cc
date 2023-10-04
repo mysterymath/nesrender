@@ -7,6 +7,7 @@
 
 #include "framebuffer-constants.h"
 #include "framebuffer.h"
+#include "log.h"
 #include "logo.h"
 #include "types.h"
 
@@ -111,18 +112,33 @@ void read_joypad1() {
   }
 }
 
-u16 x_scale = 0x100;
-u16 x_offset = 0;
+u16 u_scale = 0x100;
+u16 u_offset = 0;
+u16 y_start = 0;
+u16 y_end = 0;
+u16 v_offset = 0;
+u16 v_scale_lin = 0;
+Log v_scale;
 
 enum Select {
   X_SCALE,
   X_OFFSET,
+  Y_START,
+  Y_END,
+  Y_OFFSET,
+  Y_SCALE,
   SELECT_SIZE,
 } select;
 
-u16 *select_ptrs[] = {&x_scale, &x_offset};
-u16 select_wraps[] = {65535, u16(logo.width << 8)};
-u8 select_increments[] = {10, 64};
+u16 *select_ptrs[] = {&u_scale, &v_offset, &y_start,
+                      &y_end,  &v_offset, &v_scale_lin};
+u16 select_wraps[] = {65535,
+                      u16(logo.width << 8),
+                      u16(logo.height << 8),
+                      u16(logo.height << 8),
+                      u16(logo.height << 8),
+                      65535};
+u8 select_increments[] = {10, 64, 64, 64, 64, 10};
 
 void update() {
   latch_joypads();
@@ -194,25 +210,26 @@ int main() {
     oam_buf[0].tile = fps / 10;
     oam_buf[1].tile = fps % 10;
 
-    u16 x_pos = x_offset + x_scale / 2;
-    if (x_pos >= logo.width << 8)
-      x_pos -= logo.width << 8;
+    u16 u_pos = u_offset + u_scale / 2;
+    if (u_pos >= logo.width << 8)
+      u_pos -= logo.width << 8;
 
-    u8 x_col;
+    u8 u_col;
     const TextureColumn *texture_column = logo.columns;
-    for (x_col = 0; x_col != x_pos >> 8; ++x_col)
+    for (u_col = 0; u_col != u_pos >> 8; ++u_col)
       texture_column = texture_column->next();
 
     const auto advance_column = [&] {
-      x_pos += x_scale;
-      if (x_pos >= logo.width << 8) {
-        x_pos -= logo.width << 8;
+      u_pos += u_scale;
+      if (u_pos >= logo.width << 8) {
+        u_pos -= logo.width << 8;
         texture_column = logo.columns;
-        x_col = 0;
+        u_col = 0;
       }
-      for (; x_col != x_pos >> 8; ++x_col)
+      for (; u_col != u_pos >> 8; ++u_col)
         texture_column = texture_column->next();
     };
+    v_scale = Log(v_scale_lin);
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {
