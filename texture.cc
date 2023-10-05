@@ -46,11 +46,18 @@ extern u16 v_scale_lin;
     }
 
     const TextureSpan &span = spans[span_idx];
+    u16 start_y_pos = y_pos;
+    u16 span_v_end = span_v_begin + Log(span.size) * v_scale;
+    u8 draw_length = 0;
+    while (y_pos < y_end && v_pos < span_v_end) {
+      draw_length++;
+      y_pos += 256;
+      v_pos += v_scale_lin;
+    }
+
     if (left)
-      render_span_left(y_pos >> 8, 1, span.color);
+      render_span_left(start_y_pos >> 8, draw_length, span.color);
     else
-      render_span_right(y_pos >> 8, 1, span.color);
-    y_pos += 256;
-    v_pos += v_scale_lin;
+      render_span_right(start_y_pos >> 8, draw_length, span.color);
   }
 }
