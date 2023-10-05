@@ -141,5 +141,3 @@ static void update() {
 #endif
   player.collide();
 }
-
-extern "C" void __putchar(char c) { POKE(0x4018, c); }

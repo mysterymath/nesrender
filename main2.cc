@@ -242,5 +242,3 @@ int main() {
     last_render = cur_frame;
   }
 }
-
-extern "C" void __putchar(char c) { POKE(0x4018, c); }
