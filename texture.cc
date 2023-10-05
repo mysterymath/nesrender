@@ -1,5 +1,7 @@
 #include "texture.h"
 
+#include <stdio.h>
+
 #include "framebuffer-constants.h"
 #include "framebuffer.h"
 #include "log.h"
@@ -14,6 +16,7 @@ extern u16 y_start;
 extern u16 y_end;
 extern u16 v_offset;
 extern Log v_scale;
+extern u16 v_scale_lin;
 
 [[clang::noinline]] void TextureColumn::render(bool left) const {
   u16 y_pos = y_start;
@@ -22,24 +25,22 @@ extern Log v_scale;
   y_pos += 128;
   if (y_pos >= y_end)
     return;
-  v_pos += v_scale / Log::pow2(1);
+  v_pos += v_scale_lin / 2;
   if (v_pos >= logo.height << 8)
     v_pos -= logo.height << 8;
 
   u8 span_idx = 0;
   u16 span_v_begin = 0;
-  while (y_pos < y_end) {
-    y_pos += 256;
-    v_pos += v_scale;
-
+  for (; y_pos < y_end; y_pos += 256, v_pos += v_scale_lin) {
     if (span_v_begin > v_pos) {
       span_idx = 0;
       span_v_begin = 0;
     }
 
-    for (; span_idx < size; ++span_idx) {
+    u16 span_v_end;
+    for (; span_idx < size; ++span_idx, span_v_begin = span_v_end) {
       const TextureSpan &span = spans[span_idx];
-      u16 span_v_end = span_v_begin + span.size * v_scale;
+      span_v_end = span_v_begin + Log(span.size) * v_scale;
       if (v_pos < span_v_end) {
         if (left)
           render_span_left(y_pos >> 8, 1, span.color);

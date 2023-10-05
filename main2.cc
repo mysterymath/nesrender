@@ -115,9 +115,9 @@ void read_joypad1() {
 u16 u_scale = 0x100;
 u16 u_offset = 0;
 u16 y_start = 0;
-u16 y_end = 0;
+u16 y_end = FRAMEBUFFER_HEIGHT << 8;
 u16 v_offset = 0;
-u16 v_scale_lin = 0;
+u16 v_scale_lin = 0x100;
 Log v_scale;
 
 enum Select {
@@ -135,7 +135,7 @@ u16 *select_ptrs[] = {&u_scale, &v_offset, &y_start,
 u16 select_wraps[] = {65535,
                       u16(logo.width << 8),
                       u16(logo.height << 8),
-                      u16(logo.height << 8),
+                      u16(logo.height << 8)+1,
                       u16(logo.height << 8),
                       65535};
 u8 select_increments[] = {10, 64, 64, 64, 64, 10};
