@@ -31,23 +31,26 @@ extern u16 v_scale_lin;
 
   u8 span_idx = 0;
   u16 span_v_begin = 0;
-  for (; y_pos < y_end; y_pos += 256, v_pos += v_scale_lin) {
+  while (y_pos < y_end) {
     if (span_v_begin > v_pos) {
       span_idx = 0;
       span_v_begin = 0;
     }
 
-    u16 span_v_end;
-    for (; span_idx < size; ++span_idx, span_v_begin = span_v_end) {
+    for (; span_idx < size; ++span_idx) {
       const TextureSpan &span = spans[span_idx];
-      span_v_end = span_v_begin + Log(span.size) * v_scale;
-      if (v_pos < span_v_end) {
-        if (left)
-          render_span_left(y_pos >> 8, 1, span.color);
-        else
-          render_span_right(y_pos >> 8, 1, span.color);
+      u16 span_v_end = span_v_begin + Log(span.size) * v_scale;
+      if (v_pos < span_v_end)
         break;
-      }
+      span_v_begin = span_v_end;
     }
+
+    const TextureSpan &span = spans[span_idx];
+    if (left)
+      render_span_left(y_pos >> 8, 1, span.color);
+    else
+      render_span_right(y_pos >> 8, 1, span.color);
+    y_pos += 256;
+    v_pos += v_scale_lin;
   }
 }
