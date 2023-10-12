@@ -1,4 +1,5 @@
 from PIL import Image, ImageOps
+from math import log2
 import sys
 
 pal = [0, 0, 0] + [0x73, 0x0b, 0x00] + [0xc7, 0x2e, 0x00] + [0xff, 0x77, 0x57] + [0,0,0] * 252
@@ -51,7 +52,8 @@ with Image.open(image_filename) as im:
       for spans in columns:
         print(f"  {len(spans)},", file=f)
         for span in spans:
-          print(f"    {span[0]}, {span[1]},", file=f)
+          size_exp = int(round(log2(span[1]) * 2048))
+          print(f"    {span[0]}, 0, {size_exp & 0xff}, {(size_exp & 0xff00) >> 8},", file=f)
       print("};", file=f)
 
     im.save(name + '.png')

@@ -115,46 +115,47 @@ void read_joypad1() {
 u16 u_scale = 0x100;
 u16 u_offset = 0;
 u16 y_start = 0;
-u16 y_end = FRAMEBUFFER_HEIGHT << 8;
-u16 v_offset = 0;
-u16 v_scale_lin = 0x100;
-Log v_scale;
+u16 y_end = FRAMEBUFFER_HEIGHT;
+Log v_scale = Log::pow2(8);
 
 enum Select {
   X_SCALE,
   X_OFFSET,
   Y_START,
   Y_END,
-  Y_OFFSET,
-  Y_SCALE,
+  V_SCALE,
   SELECT_SIZE,
 } select;
 
-u16 *select_ptrs[] = {&u_scale, &v_offset, &y_start,
-                      &y_end,  &v_offset, &v_scale_lin};
+u16 *select_ptrs[] = {&u_scale, &u_offset, &y_start, &y_end};
 u16 select_wraps[] = {65535,
                       u16(logo.width << 8),
-                      u16(logo.height << 8),
-                      u16(logo.height << 8)+1,
-                      u16(logo.height << 8),
-                      65535};
+                      FRAMEBUFFER_HEIGHT << 8,
+                      FRAMEBUFFER_HEIGHT << 8};
 u8 select_increments[] = {10, 64, 64, 64, 64, 10};
 
 void update() {
   latch_joypads();
   read_joypad1();
-  u16 *ptr = select_ptrs[select];
-  u16 wrap = select_wraps[select];
-  u8 increment = select_increments[select];
-  if (joy1 & JOY_RIGHT_MASK) {
-    if (*ptr < increment)
-      *ptr += wrap;
-    *ptr -= increment;
-  }
-  if (joy1 & JOY_LEFT_MASK) {
-    *ptr += increment;
-    if (*ptr >= wrap)
-      *ptr -= wrap;
+  if (select == V_SCALE) {
+    if (joy1 & JOY_RIGHT_MASK)
+      v_scale *= Log(1.01f);
+    if (joy1 & JOY_LEFT_MASK)
+      v_scale /= Log(1.01f);
+  } else {
+    u16 *ptr = select_ptrs[select];
+    u16 wrap = select_wraps[select];
+    u8 increment = select_increments[select];
+    if (joy1 & JOY_RIGHT_MASK) {
+      if (*ptr < increment)
+        *ptr += wrap;
+      *ptr -= increment;
+    }
+    if (joy1 & JOY_LEFT_MASK) {
+      *ptr += increment;
+      if (*ptr >= wrap)
+        *ptr -= wrap;
+    }
   }
   if (joy1 & ~joy1_prev & JOY_BTN_A_MASK)
     select = Select((select + 1) % SELECT_SIZE);
@@ -229,7 +230,6 @@ int main() {
       for (; u_col != u_pos >> 8; ++u_col)
         texture_column = texture_column->next();
     };
-    v_scale = Log(v_scale_lin);
     for (u8 column_offset = 0;
          column_offset < FRAMEBUFFER_WIDTH_TILES * framebuffer_stride;
          column_offset += framebuffer_stride) {

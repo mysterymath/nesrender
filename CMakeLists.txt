@@ -51,3 +51,4 @@ add_executable(render2
 )
 target_include_directories(render2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_options(render2 PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld)
+set_property(TARGET render2 PROPERTY CXX_STANDARD 20)

@@ -12,7 +12,7 @@ struct Log {
   Log(int16_t val);
   template <typename T> Log(T val) : Log(static_cast<int16_t>(val)) {}
   constexpr Log(bool sign, int16_t exp) : sign(sign), exp(exp){};
-  explicit constexpr Log(float val);
+  explicit consteval Log(float val);
 
   static constexpr Log pow2(uint8_t k) { return Log(false, k << 11); }
   static constexpr Log zero() { return Log(false, -32768); }
@@ -35,7 +35,7 @@ struct Log {
   bool operator!=(const Log &other) const;
 };
 
-constexpr Log::Log(float val) : sign(false), exp(0) {
+consteval Log::Log(float val) : sign(false), exp(0) {
   if (val == 0) {
     exp = -32768;
     return;
@@ -51,6 +51,7 @@ constexpr Log::Log(float val) : sign(false), exp(0) {
     fexp = -32768;
   if (fexp >= 15 * 2048)
     fexp = 15 * 2048 - 1;
+  exp = fexp;
 }
 
 #endif // not LOG_H

@@ -1,11 +1,12 @@
 #ifndef TEXTURE_H
 #define TEXTURE_H
 
+#include "log.h"
 #include "types.h"
 
 struct TextureSpan {
   u8 color;
-  u8 size;
+  Log size; // in 1/256 texel
 };
 
 struct TextureColumn {
