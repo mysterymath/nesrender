@@ -21,7 +21,8 @@ extern Log v_scale;
   u8 span_idx = 0;
   for (u16 y_pos = y_start; y_pos < y_end;) {
     const TextureSpan &span = spans[span_idx];
-    u16 y_size = span.size * v_scale; // in 1/256 pixel
+    // Unchecked mul
+    u16 y_size = Log(false, span.size.exp + v_scale.exp); // in 1/256 pixel
     if (y_size >= y_end - y_pos)
       y_size = y_end - y_pos;
 

@@ -81,6 +81,7 @@ Log &Log::operator*=(const Log &other) {
   exp = newexp;
   return *this;
 }
+
 Log Log::operator/(const Log &other) const { return (Log)(*this) /= other; }
 Log &Log::operator/=(const Log &other) {
   if (other.sign)
@@ -91,7 +92,6 @@ Log &Log::operator/=(const Log &other) {
   exp = newexp;
   return *this;
 }
-
 bool Log::operator<(const Log &other) const {
   if (sign != other.sign)
     return sign;
