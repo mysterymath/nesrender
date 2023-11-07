@@ -115,7 +115,7 @@ void read_joypad1() {
 u16 u_scale = 0x100;
 u16 u_offset = 0;
 u16 y_start = 0;
-u16 y_end = FRAMEBUFFER_HEIGHT;
+u16 y_end = FRAMEBUFFER_HEIGHT * 256;
 Log v_scale = Log::pow2(8);
 
 enum Select {

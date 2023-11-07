@@ -18,8 +18,6 @@ extern u16 y_end;
 extern Log v_scale;
 
 [[clang::noinline]] void TextureColumn::render(bool left) const {
-  u16 y_pos = y_start;
-
   u8 span_idx = 0;
   for (u16 y_pos = y_start; y_pos < y_end;) {
     const TextureSpan &span = spans[span_idx];

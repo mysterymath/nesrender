@@ -4,6 +4,7 @@ find_package(llvm-mos-sdk REQUIRED)
 project(render LANGUAGES ASM C CXX)
 
 set(CMAKE_EXECUTABLE_SUFFIX .nes)
+set(CMAKE_CXX_STANDARD 20)
 
 add_executable(render
 	chr.s
@@ -51,4 +52,3 @@ add_executable(render2
 )
 target_include_directories(render2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_options(render2 PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld)
-set_property(TARGET render2 PROPERTY CXX_STANDARD 20)
